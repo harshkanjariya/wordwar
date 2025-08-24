@@ -1,0 +1,24 @@
+16:02:53.524 [NamespaceSystem-akka.actor.default-dispatcher-5] INFO akka.event.slf4j.Slf4jLogger - Slf4jLogger started
+16:02:53.585 [main] INFO com.firebase.server.forge.App$ - Listening at 127.0.0.1:9000
+16:02:57.129 [NamespaceSystem-akka.actor.default-dispatcher-7] INFO com.firebase.core.namespace.NamespaceActor - word-war-4 successfully activated FBKV (SurveyIdle(0)) wait: 44ms, init: 0ms
+16:02:58.166 [FirebaseWorkerPool-1-2] WARN com.firebase.core.persistence.backend.dummy.EmulatorMetadataPersistence - Multiple projectIds are not recommended in single project mode. Requested 
+namespace fake-server, but the emulator is configured for word-war-4. To 
+opt-out of single project mode add/set the singleProjectMode: false property in 
+the firebase.json emulators config. 
+16:02:58.171 [NamespaceSystem-akka.actor.default-dispatcher-11] INFO com.firebase.core.namespace.NamespaceActor - fake-server successfully activated FBKV (SurveyIdle(0)) wait: 1ms, init: 0ms
+16:02:58.198 [NamespaceSystem-blocking-namespace-operation-dispatcher-12] INFO com.firebase.core.namespace.StateManager - Namespace word-war-4 status Active to Active
+16:02:58.198 [NamespaceSystem-blocking-namespace-operation-dispatcher-13] INFO com.firebase.core.namespace.StateManager - Namespace fake-server status Active to Active
+16:02:58.201 [FirebaseWorkerPool-1-2] WARN com.firebase.core.persistence.backend.dummy.EmulatorMetadataPersistence - Multiple projectIds are not recommended in single project mode. Requested 
+namespace word-war-4-default-rtdb, but the emulator is configured for fake-server,word-war-4. To 
+opt-out of single project mode add/set the singleProjectMode: false property in 
+the firebase.json emulators config. 
+16:02:58.203 [NamespaceSystem-akka.actor.default-dispatcher-8] INFO com.firebase.core.namespace.NamespaceActor - word-war-4-default-rtdb successfully activated FBKV (SurveyIdle(0)) wait: 1ms, init: 0ms
+16:02:58.205 [NamespaceSystem-blocking-namespace-operation-dispatcher-13] INFO com.firebase.core.namespace.StateManager - Namespace word-war-4-default-rtdb status Active to Active
+16:03:15.231 [NamespaceSystem-blocking-namespace-operation-dispatcher-15] INFO com.firebase.core.stats.EventAuditLog - {"eventId":"V51Y6uy9iMVrPOfy/VcvCL4fmnc=","namespace":"word-war-4","projectNumber":"123456789","eventType":"google.firebase.database.ref.v1.created","flowName":"projects/word-war-4/topics/us-central1-onJoinQueue-0","resource":"projects/_/instances/word-war-4/refs/matchmaking_queues/2/fasheasg","evaluationTimestamp":"2025-08-24T10:33:15.211Z","stage":"TRIGGERED"}
+16:03:48.306 [NamespaceSystem-blocking-namespace-operation-dispatcher-17] INFO com.firebase.core.stats.EventAuditLog - {"eventId":"euY+EC/ltnkZu7f4GgXDy7WBj3Q=","namespace":"word-war-4","projectNumber":"123456789","eventType":"google.firebase.database.ref.v1.created","flowName":"projects/word-war-4/topics/us-central1-onJoinQueue-0","resource":"projects/_/instances/word-war-4/refs/matchmaking_queues/2/-OYQd1lLYjSSiBn0jyH5","evaluationTimestamp":"2025-08-24T10:33:48.304Z","stage":"TRIGGERED"}
+16:05:36.308 [Thread-0] INFO com.firebase.server.forge.App$ - Attempting graceful shutdown.
+16:05:36.313 [NamespaceSystem-akka.actor.default-dispatcher-8] INFO com.firebase.core.namespace.Terminator$Terminator - 3 actors left to terminate: fake-server, word-war-4-default-rtdb, word-war-4
+16:05:36.318 [NamespaceSystem-akka.actor.default-dispatcher-5] INFO com.firebase.core.namespace.NamespaceActor - stopped namespace actor for word-war-4
+16:05:36.318 [NamespaceSystem-akka.actor.default-dispatcher-7] INFO com.firebase.core.namespace.NamespaceActor - stopped namespace actor for fake-server
+16:05:36.318 [NamespaceSystem-akka.actor.default-dispatcher-10] INFO com.firebase.core.namespace.NamespaceActor - stopped namespace actor for word-war-4-default-rtdb
+16:05:36.322 [Thread-0] INFO com.firebase.server.forge.App$ - Graceful shutdown complete.

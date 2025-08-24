@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "535433341383",
+    "firebase_url": "https://word-war-4-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "word-war-4",
+    "storage_bucket": "word-war-4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:535433341383:android:194df6b728f4bb7ca351e2",
+        "android_client_info": {
+          "package_name": "com.harshkanjariya.wordwar"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "535433341383-c3i5m1j7vv34o17rkbsfn8mlagdjqj3i.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.harshkanjariya.wordwar",
+            "certificate_hash": "4def2e84cd128e99f7ee89ed5eb936066be0072a"
+          }
+        },
+        {
+          "client_id": "535433341383-vhff3t60a72trbuunimcgpl30bevbuf6.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBeP6XbY5btEONJ1NKC2iGZtPwSctD9vg0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "535433341383-0dt7cb729utouhtvj91c28tp1v3opu3a.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

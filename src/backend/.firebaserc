@@ -1,0 +1,6 @@
+{
+  "projects": {
+    "default": "xkartindia",
+    "production": "xkartindia"
+  }
+}

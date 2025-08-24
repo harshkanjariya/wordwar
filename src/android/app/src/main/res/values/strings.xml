@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">WordWar</string>
+    <string name="title_activity_game">GameActivity</string>
+    <string name="dummy_button">Dummy Button</string>
+    <string name="dummy_content">DUMMY\nCONTENT</string>
+    <string name="server_client_id">535433341383-0dt7cb729utouhtvj91c28tp1v3opu3a.apps.googleusercontent.com</string>
+</resources>

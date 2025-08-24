@@ -1,0 +1,17 @@
+{
+  "rules": {
+    "matchmaking_queues": {
+      ".read": "true",
+
+      "$queueSize": {
+        "$uid": {
+          ".write": "true"
+        }
+      }
+    },
+    "live_games": {
+      ".read": "true",
+      ".write": "true"
+    }
+  }
+}
