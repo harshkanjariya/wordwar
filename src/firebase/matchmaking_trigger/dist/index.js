@@ -42,58 +42,61 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.debugLogger = exports.onJoinQueue = void 0;
+exports.onJoinQueue = void 0;
 const admin = __importStar(require("firebase-admin"));
 const database_1 = require("firebase-functions/v2/database");
 admin.initializeApp();
-exports.onJoinQueue = (0, database_1.onValueWritten)({ ref: "/matchmaking_queues/{queueSize}/{userId}" }, (event) => __awaiter(void 0, void 0, void 0, function* () {
-    const { before, after } = event.data;
-    const { queueSize: matchSize, userId } = event.params;
-    console.log("Triggered onJoinQueue", { matchSize, userId });
-    if (!before.exists() && after.exists()) {
-        console.log("New player joined queue", { userId });
-        const queueRef = admin.database().ref(`/matchmaking_queues/${matchSize}`);
-        let playersToMatch = [];
-        const transactionResult = yield queueRef.transaction((currentQueue) => {
-            console.log("Running transaction", { currentQueue });
-            if (!currentQueue) {
-                console.log("Queue empty, nothing to do");
-                return null;
-            }
-            const ids = Object.keys(currentQueue);
-            const size = parseInt(matchSize, 10);
-            console.log("Current queue size", { ids, size });
-            if (ids.length >= size) {
-                playersToMatch = ids.slice(0, size);
-                const remaining = ids.slice(size);
-                const updated = {};
-                for (const id of remaining)
-                    updated[id] = currentQueue[id];
-                console.log("Formed match", { playersToMatch, remaining });
-                return updated;
-            }
-            console.log("Not enough players to match yet");
-            return currentQueue;
-        });
-        console.log("Transaction result", { committed: transactionResult.committed });
-        if (transactionResult.committed && playersToMatch.length) {
-            console.log("Pushing live game", { playersToMatch, matchSize });
-            yield admin.database().ref("live_games").push({
-                players: playersToMatch,
-                matchSize: parseInt(matchSize, 10),
-            });
+exports.onJoinQueue = (0, database_1.onValueCreated)({
+    ref: "/matchmaking_queues/{queueSize}/{userId}",
+    region: "us-central1",
+}, (event) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const { queueSize, userId } = event.params;
+    const db = admin.database();
+    console.log("Triggered onJoinQueue", { queueSize, userId });
+    const parentRef = event.data.ref.parent;
+    if (!parentRef) {
+        console.error("No parent ref found for event");
+        return;
+    }
+    const size = parseInt(queueSize, 10);
+    // 🔒 Transaction to ensure only one function instance succeeds
+    const result = yield parentRef.transaction((currentQueue) => {
+        console.log("Running transaction with currentQueue:", currentQueue);
+        if (!currentQueue) {
+            return currentQueue; // no players
         }
-    }
-    else {
-        console.log("Ignored event", { beforeExists: before.exists(), afterExists: after.exists() });
-    }
-}));
-exports.debugLogger = (0, database_1.onValueWritten)({ ref: "/{path=**}" }, // catch ALL writes anywhere in RTDB
-(event) => __awaiter(void 0, void 0, void 0, function* () {
-    const { before, after } = event.data;
-    const { path } = event.params;
-    console.log("🔥 debugLogger triggered!");
-    console.log("Path:", path);
-    console.log("Before value:", before.val());
-    console.log("After value:", after.val());
+        const ids = Object.keys(currentQueue);
+        if (ids.length >= size) {
+            // Pick first `size` players
+            const playersToMatch = ids.slice(0, size);
+            // Keep only remaining players in queue
+            const updated = {};
+            for (const id of ids.slice(size)) {
+                updated[id] = currentQueue[id];
+            }
+            console.log("Formed match", { playersToMatch, remaining: Object.keys(updated) });
+            // --- Move the live_games creation logic inside the transaction ---
+            // Create the new live_games object
+            const playersJson = {};
+            for (const playerId of playersToMatch) {
+                playersJson[playerId] = {
+                    actions: {},
+                };
+            }
+            console.log(playersJson);
+            db.ref("live_games").push({
+                players: playersJson,
+                matchSize: size,
+                createdAt: Date.now(),
+            });
+            return updated; // This commits the change to the queue
+        }
+        // Not enough players yet
+        return currentQueue;
+    });
+    console.log("Transaction result:", {
+        committed: result.committed,
+        snapshot: (_a = result.snapshot) === null || _a === void 0 ? void 0 : _a.val(),
+    });
 }));

@@ -10,9 +10,9 @@ import androidx.navigation.NavController
 import com.google.firebase.database.ChildEventListener
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
-import com.google.firebase.database.FirebaseDatabase
 import com.harshkanjariya.wordwar.data.LocalStorage // Import LocalStorage
 import com.harshkanjariya.wordwar.data.getUserIdFromJwt
 
@@ -52,20 +52,18 @@ fun QueueScreen(navController: NavController, matchSize: Int) {
 
     // Use a DisposableEffect for the listener, keyed by userId
     DisposableEffect(userId) {
+        // This is the new, corrected query. It looks for a child of `players` with the key of the userId.
         val userStatusRef = database.getReference("live_games")
-            .orderByChild("players").equalTo(userId)
+            .orderByChild("players/$userId")
+            .startAt("") // This is a trick to find a child that exists with any non-null value.
             .limitToFirst(1)
 
         val listener = userStatusRef.addChildEventListener(object : ChildEventListener {
             override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
-                val match = snapshot.value as? Map<String, Any>
-                if (match != null) {
-                    val players = match["players"] as? List<String>
-                    if (players?.contains(userId) == true) {
-                        foundMatchId = snapshot.key
-                        statusMessage = "Match found!"
-                    }
-                }
+                // The snapshot is the match object (e.g., the -OYR7t-59fvq_1z8-TOv node)
+                // The query already guarantees that this match contains the user ID.
+                foundMatchId = snapshot.key
+                statusMessage = "Match found!"
             }
             // Other methods omitted for brevity
             override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) {}
