@@ -43,18 +43,27 @@ export const onJoinQueue = onValueCreated(
           {
             actions: Record<string, unknown>,
             status: string,
+            joinedAt: string,
           }> = {};
         for (const playerId of playersToMatch) {
           playersJson[playerId] = {
             actions: {},
             status: "On",
+            joinedAt: currentQueue[playerId]?.timestamp,
           };
         }
+
+        // Create the 10x10 array with empty strings
+        const cellData: string[][] = Array.from({length: 10}, () => Array(10).fill(""));
 
         db.ref("live_games").push({
           players: playersJson,
           matchSize: size,
           createdAt: Date.now(),
+          cellData: cellData,
+          currentPlayer: playersToMatch[0],
+          selectedCell: "",
+          turnTimestamp: Date.now(),
         });
 
         return updated; // This commits the change to the queue
