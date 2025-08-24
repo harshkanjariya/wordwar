@@ -4,9 +4,13 @@ import {ClientSession} from "mongodb";
 import {Configuration} from "../types/configuration";
 import {ApiCallLog, WebhookLog} from "../types/logs";
 import {Permission, Role, User} from "../types";
+import {GameHistory, LiveGame} from "../types/game";
 
 type RepoToType = {
   users: User;
+
+  live_games: LiveGame;
+  game_history: GameHistory;
 
   roles: Role;
   permissions: Permission;
@@ -32,6 +36,9 @@ export function initializeRepositories() {
   repositories["users"] = new BaseRepository<User>("users", [
     [{email: 1}, {unique: true}],
   ]);
+
+  repositories["live_games"] = new BaseRepository<LiveGame>("live_games", []);
+  repositories["game_history"] = new BaseRepository<GameHistory>("game_history", []);
 
   repositories["roles"] = new BaseRepository<Role>("roles", []);
   repositories["permissions"] = new BaseRepository<Permission>("permissions", [

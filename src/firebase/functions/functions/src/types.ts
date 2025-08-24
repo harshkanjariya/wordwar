@@ -53,3 +53,22 @@ export interface LiveGame {
    */
   turnTimestamp: number;
 }
+
+
+// Define the structure of the nested 'data' object from the API response.
+export interface GameData {
+  _id: string;
+  players: { [key: string]: { status: string; joinedAt: number } };
+  matchSize: number;
+  createdAt: string;
+  currentPlayer: string;
+  selectedCell: string;
+  turnTimestamp: number;
+  updatedAt: string;
+}
+
+// Define the overall structure of the API response.
+export interface ApiResponse {
+  status: number;
+  data: GameData;
+}

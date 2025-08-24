@@ -1,8 +1,0 @@
-.env
-.env.vercel
-.idea
-node_modules
-.vercel
-tmp
-dist
-package-lock.json

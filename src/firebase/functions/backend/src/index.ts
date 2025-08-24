@@ -11,6 +11,7 @@ import * as functions from "firebase-functions";
 // Import all routes
 import * as authRoutes from "./routes/auth";
 import * as usersRoutes from "./routes/users";
+import * as gameRoutes from "./routes/game";
 import * as configurationsRoutes from "./routes/configurations";
 import * as filesRoutes from "./routes/files";
 import * as webhooksRoutes from "./routes/webhooks";
@@ -65,7 +66,7 @@ async function createServer() {
   // Register routes
   const routes = [
     authRoutes, usersRoutes, configurationsRoutes,
-    filesRoutes, webhooksRoutes,
+    filesRoutes, webhooksRoutes, gameRoutes,
 
     adminAuthRoutes, adminUsersRoutes, adminRolesRoutes,
     adminAnalyticsRoutes, adminConfigurationsRoutes,

@@ -30,7 +30,7 @@ fun QueueScreen(navController: NavController, matchSize: Int) {
     }
 
     val database = FirebaseDatabase.getInstance()
-    val queueRef = database.getReference("matchmaking_queues").child(matchSize.toString())
+    val queueRef = database.getReference("matchmaking_queue").child(matchSize.toString())
 
     var statusMessage by remember { mutableStateOf("In queue...") }
     var foundMatchId by remember { mutableStateOf<String?>(null) }
@@ -60,8 +60,6 @@ fun QueueScreen(navController: NavController, matchSize: Int) {
 
         val listener = userStatusRef.addChildEventListener(object : ChildEventListener {
             override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
-                // The snapshot is the match object (e.g., the -OYR7t-59fvq_1z8-TOv node)
-                // The query already guarantees that this match contains the user ID.
                 foundMatchId = snapshot.key
                 statusMessage = "Match found!"
             }
