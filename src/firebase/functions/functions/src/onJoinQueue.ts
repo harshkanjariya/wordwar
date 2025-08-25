@@ -1,9 +1,11 @@
-import * as admin from "firebase-admin";
-import {onValueCreated} from "firebase-functions/v2/database";
-import {ApiResponse, Player} from "./types";
-import fetch from "node-fetch";
+import {admin, ApiResponse, Player} from "./types";
+import {onValueCreated} from "firebase-functions/database";
 
-// eslint-disable-next-line require-jsdoc
+/**
+ * Creates a new game via an external API.
+ * @param {object} payload The game payload to send to the API.
+ * @return {Promise<string>} The ID of the newly created game.
+ */
 async function createGameViaApi(payload: any): Promise<string> {
   const apiURL = "https://word-war-4.web.app/api";
   const apiKey = "5cdf2476-491a-4cc5-8ff2-ecd8767a7e23";
@@ -53,64 +55,55 @@ export const onJoinQueue = onValueCreated(
 
     const size = parseInt(queueSize as string, 10);
 
-    const transactionResult = await parentRef.transaction(async (currentQueueData) => {
-      if (!currentQueueData) {
-        console.warn("Queue is empty. Aborting transaction.");
-        return;
-      }
+    const queueSnapshot = await parentRef.get();
+    const data = queueSnapshot.val();
 
-      const ids = Object.keys(currentQueueData);
+    if (!data) {
+      console.warn("Queue is empty. Aborting match attempt.");
+      return;
+    }
 
-      if (ids.length >= size) {
-        console.log("Forming match inside transaction...", {currentQueueData});
-        const playersToMatch = ids.slice(0, size);
+    const ids = Object.keys(data);
 
-        const playersJson: Record<string, Player> = {};
-        for (const playerId of playersToMatch) {
-          playersJson[playerId] = {
-            status: "Online",
-            joinedAt: currentQueueData[playerId]?.timestamp,
-          };
-        }
+    if (ids.length >= size) {
+      const playersToMatch = ids.slice(0, size);
 
-        const cellData: string[][] = Array.from({length: 10}, () => Array(10).fill(""));
-        const gamePayload = {
-          players: playersJson,
-          matchSize: size,
-          createdAt: Date.now(),
-          cellData: cellData,
-          currentPlayer: playersToMatch[0],
-          selectedCell: "",
-          turnTimestamp: Date.now(),
+      const playersJson: Record<string, Player> = {};
+      for (const playerId of playersToMatch) {
+        playersJson[playerId] = {
+          status: "Online",
+          joinedAt: data[playerId]?.timestamp,
         };
+      }
 
-        let liveGameId: string;
-        try {
-          liveGameId = await createGameViaApi(gamePayload);
-        } catch (error) {
-          console.error("Transaction failed: API call failed.");
-          return;
-        }
+      const cellData: string[][] = Array.from({length: 10}, () => Array(10).fill(""));
+      const gamePayload = {
+        players: playersJson,
+        matchSize: size,
+        createdAt: Date.now(),
+        cellData: cellData,
+        currentPlayer: playersToMatch[0],
+        selectedCell: "",
+        turnTimestamp: Date.now(),
+      };
 
-        const updatedQueue: Record<string, unknown> = {};
-        for (const id of ids.slice(size)) {
-          updatedQueue[id] = currentQueueData[id];
-        }
-
-        await db.ref(`live_games/${liveGameId}`).set(gamePayload);
-
-        console.log("Transaction successful: Game created and queue updated.");
-        return updatedQueue;
-      } else {
-        console.log("Not enough players yet. Aborting transaction.");
+      let liveGameId: string;
+      try {
+        liveGameId = await createGameViaApi(gamePayload);
+      } catch (error) {
+        console.error("Matchmaking failed: API call to create game failed.");
         return;
       }
-    });
 
-    if (transactionResult.committed) {
-      console.log("Matchmaking transaction completed successfully.");
+      const updatedQueue: Record<string, unknown> = {};
+      for (const id of ids.slice(size)) {
+        updatedQueue[id] = data[id];
+      }
+
+      await db.ref(`live_games/${liveGameId}`).set(gamePayload);
+      await parentRef.set(updatedQueue);
     } else {
-      console.log("Matchmaking transaction aborted or failed.");
+      console.log("Not enough players yet. Waiting for more to join.");
     }
   }
 );

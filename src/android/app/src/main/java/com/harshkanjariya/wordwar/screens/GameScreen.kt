@@ -3,11 +3,32 @@ package com.harshkanjariya.wordwar.screens
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ThumbUp
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -26,13 +47,11 @@ import com.harshkanjariya.wordwar.components.GameHeader
 import com.harshkanjariya.wordwar.components.WordGrid
 import com.harshkanjariya.wordwar.data.LocalStorage
 import com.harshkanjariya.wordwar.data.getUserIdFromJwt
-import com.harshkanjariya.wordwar.network.service.GameActionPayload
 import com.harshkanjariya.wordwar.network.service.CellCoordinatePayload
 import com.harshkanjariya.wordwar.network.service.ClaimedWordPayload
-import com.harshkanjariya.wordwar.network.service.GameService
+import com.harshkanjariya.wordwar.network.service.GameActionPayload
 import com.harshkanjariya.wordwar.network.service_holder.GameServiceHolder
 import com.harshkanjariya.wordwar.network.service_holder.isWordValid
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -51,7 +70,8 @@ data class Cell(
 fun GameScreen(navController: NavController, matchId: String?) {
     val scope = rememberCoroutineScope()
     val gridSize = 10
-    val cells = remember { mutableStateListOf<String>().apply { addAll(List(gridSize * gridSize) { "" }) } }
+    val cells =
+        remember { mutableStateListOf<String>().apply { addAll(List(gridSize * gridSize) { "" }) } }
     var currentMode by remember { mutableStateOf(GameMode.FILLING) }
     var isKeyboardVisible by remember { mutableStateOf(false) }
     var selectedCellIndexForInput by remember { mutableIntStateOf(-1) }
@@ -110,7 +130,14 @@ fun GameScreen(navController: NavController, matchId: String?) {
                     }
 
                     val gameData = snapshot.value as? Map<String, Any>
-                    val players = gameData?.get("players") as? Map<String, Any>
+                    val newCellData2D = gameData?.get("cellData") as? List<List<String>>
+
+                    if (newCellData2D != null) {
+                        val newCellData1D = newCellData2D.flatten()
+
+                        cells.clear()
+                        cells.addAll(newCellData1D)
+                    }
 
                     val newCurrentPlayer = gameData?.get("currentPlayer") as? String ?: ""
                     val newTurnTimestamp = gameData?.get("turnTimestamp") as? Long ?: 0L
@@ -119,22 +146,6 @@ fun GameScreen(navController: NavController, matchId: String?) {
                     if (newTurnTimestamp != turnTimestamp) {
                         turnTimestamp = newTurnTimestamp
                         hasTriggeredTurnAdvance = false
-                    }
-
-                    if (players != null) {
-                        val actions = players.flatMap { (playerId, playerInfo) ->
-                            val infoMap = playerInfo as? Map<String, Any>
-                            val actionsMap = infoMap?.get("actions") as? Map<String, Map<String, Any>>
-                            actionsMap?.mapNotNull { (actionId, actionInfo) ->
-                                val row = actionInfo["row"] as? Long
-                                val col = actionInfo["col"] as? Long
-                                val char = actionInfo["char"] as? String
-                                if (row != null && col != null && char != null) {
-                                    (row.toInt() * gridSize) + col.toInt() to char
-                                } else null
-                            } ?: emptyList()
-                        }
-                        actions.forEach { (index, char) -> cells[index] = char }
                     }
                 }
             }
@@ -194,13 +205,25 @@ fun GameScreen(navController: NavController, matchId: String?) {
                             val claimedWordPayloads = if (currentMode == GameMode.SELECTION) {
                                 if (selectedCells.isNotEmpty()) {
                                     val word = buildString {
-                                        selectedCells.sorted().forEach { index -> append(cells[index]) }
+                                        selectedCells.sorted()
+                                            .forEach { index -> append(cells[index]) }
                                     }
-                                    if (word.isNotBlank() && isWordValid(word) && !claimedWords.contains(word)) {
+                                    if (word.isNotBlank() && isWordValid(word) && !claimedWords.contains(
+                                            word
+                                        )
+                                    ) {
                                         val coordinates = selectedCells.map { index ->
-                                            CellCoordinatePayload(row = index / gridSize, col = index % gridSize)
+                                            CellCoordinatePayload(
+                                                row = index / gridSize,
+                                                col = index % gridSize
+                                            )
                                         }
-                                        listOf(ClaimedWordPayload(word = word, cellCoordinates = coordinates))
+                                        listOf(
+                                            ClaimedWordPayload(
+                                                word = word,
+                                                cellCoordinates = coordinates
+                                            )
+                                        )
                                     } else {
                                         snackbarHostState.showSnackbar("Invalid or already claimed word.")
                                         emptyList()
@@ -247,7 +270,8 @@ fun GameScreen(navController: NavController, matchId: String?) {
             GameHeader(
                 currentMode = currentMode,
                 onToggleMode = {
-                    currentMode = if (currentMode == GameMode.FILLING) GameMode.SELECTION else GameMode.FILLING
+                    currentMode =
+                        if (currentMode == GameMode.FILLING) GameMode.SELECTION else GameMode.FILLING
                     selectedCells = emptySet()
                     isKeyboardVisible = false
                 },
@@ -255,7 +279,10 @@ fun GameScreen(navController: NavController, matchId: String?) {
             )
             Spacer(Modifier.height(12.dp))
 
-            Text(text = if (userId == currentPlayer) "Your Turn!" else "Opponent's Turn", fontSize = 20.sp)
+            Text(
+                text = if (userId == currentPlayer) "Your Turn!" else "Opponent's Turn",
+                fontSize = 20.sp
+            )
             Spacer(Modifier.height(8.dp))
             Text(text = "Time Left: $remainingTime s", fontSize = 24.sp)
             Spacer(Modifier.height(16.dp))
@@ -285,7 +312,8 @@ fun GameScreen(navController: NavController, matchId: String?) {
                 onClaimWord = { /* Logic handled by FAB now */ },
                 onEndGame = {
                     scope.launch {
-                        gameRef.child("players").child(userId).child("status").onDisconnect().cancel()
+                        gameRef.child("players").child(userId).child("status").onDisconnect()
+                            .cancel()
 
                         val result = GameServiceHolder.api.quitGame()
                         if (result.status == 200 && result.data != null) {

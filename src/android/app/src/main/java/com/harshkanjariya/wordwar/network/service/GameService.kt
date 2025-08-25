@@ -40,18 +40,18 @@ data class GameInfo(
 )
 
 interface GameService {
-    @POST("/api/game/submit_action")
+    @POST("game/submit_action")
     suspend fun submitAction(
         @Body payload: GameActionPayload
     )
 
-    @GET("/api/game/active")
+    @GET("game/active")
     suspend fun getActiveGame(): ApiResponse<ActiveGameResponse>
 
-    @GET("/api/game/quit")
+    @GET("game/quit")
     suspend fun quitGame(): ApiResponse<Boolean>
 
-    @GET("/api/game/info/{gameId}")
+    @GET("game/info/{gameId}")
     suspend fun getGameInfo(
         @Path("gameId") gameId: String
     ): ApiResponse<GameInfo>

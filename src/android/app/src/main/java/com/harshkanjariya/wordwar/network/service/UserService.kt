@@ -5,6 +5,6 @@ import com.harshkanjariya.wordwar.data.UserProfile
 import retrofit2.http.GET
 
 interface UserService {
-    @GET("/api/users")
+    @GET("users")
     suspend fun getUserProfile(): ApiResponse<UserProfile>
 }

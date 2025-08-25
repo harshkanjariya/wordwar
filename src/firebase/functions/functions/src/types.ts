@@ -1,3 +1,11 @@
+import * as admin from "firebase-admin";
+
+admin.initializeApp({
+  databaseURL: "https://word-war-4-default-rtdb.asia-southeast1.firebasedatabase.app",
+});
+
+export {admin};
+
 /**
  * Represents a single player's data within a live game.
  */

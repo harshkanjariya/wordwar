@@ -25,7 +25,7 @@ android {
         productFlavors {
             create("local") {
                 dimension = "env"
-                buildConfigField("String", "BACKEND_URL", "\"http://192.168.1.4:10000\"")
+                buildConfigField("String", "BACKEND_URL", "\"http://192.168.1.4:5001/word-war-4/asia-south1/api/api/\"")
             }
             create("staging") {
                 dimension = "env"
