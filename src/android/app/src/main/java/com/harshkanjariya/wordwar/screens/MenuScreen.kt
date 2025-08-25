@@ -1,5 +1,6 @@
 package com.harshkanjariya.wordwar.screens
 
+import android.app.Activity
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -20,6 +21,7 @@ import androidx.navigation.NavController
 import com.harshkanjariya.wordwar.data.LocalStorage
 import com.harshkanjariya.wordwar.network.service_holder.UserServiceHolder
 import kotlinx.coroutines.launch
+import kotlin.system.exitProcess
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -94,7 +96,7 @@ fun MenuScreen(navController: NavController) {
             }
             Spacer(Modifier.height(8.dp))
             OutlinedButton(onClick = {
-                navController.navigate("login") { popUpTo("menu") { inclusive = true } }
+                (navController.context as Activity).finish()
             }, modifier = Modifier.width(220.dp)) {
                 Text("Quit")
             }

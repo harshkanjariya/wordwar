@@ -170,7 +170,7 @@ export async function performGameAction(user: FullDocument<User>, body: GameActi
 }
 
 export async function getCurrentGameInfo(user: FullDocument<User>) {
-  const userData = await repositories.users.findOne({filter: {_id: user._id}});
+  const userData = await repositories.users.findOne({ filter: { _id: user._id } });
 
   if (!userData) {
     throw new ApiError("User not found", 401);
@@ -194,28 +194,51 @@ export async function getCurrentGameInfo(user: FullDocument<User>) {
     if (!currentGameId) {
       return {
         currentGameId: null,
-        liveGameData: null,
+        gameData: null,
       };
     }
   }
 
   try {
-    const dbGameData = await repositories.live_games.findOne({filter: {_id: userData.currentGameId}});
+    const dbGameData = await repositories.live_games.findOne({ filter: { _id: userData.currentGameId } });
+    if (!dbGameData && !liveGameData) {
+      return {
+        currentGameId: userData.currentGameId,
+        gameData: null,
+      };
+    }
+
+    const mergedGame = {
+      ...dbGameData,
+      ...liveGameData,
+    };
+
+    const players = await repositories.users.findAll({
+      filter: { _id: { $in: mergedGame.players.map((p: string) => ObjectId.createFromHexString(p)) } },
+    });
+
+    const playersFormatted = mergedGame.players.map((playerId: string) => {
+      const player = players.find((u: any) => u._id.toString() === playerId.toString());
+      return {
+        _id: playerId,
+        name: player?.name ?? "Unknown",
+        joinedAt: mergedGame.joinedAt?.[playerId] ?? null,
+        claimedWords: mergedGame.claimedWords?.[playerId] ?? [],
+      };
+    });
 
     return {
       currentGameId: userData.currentGameId,
       gameData: {
-        ...dbGameData,
-        ...liveGameData,
+        createdAt: mergedGame.createdAt,
+        updatedAt: mergedGame.updatedAt,
+        cellData: mergedGame.cellData,
+        players: playersFormatted,
       },
     };
   } catch (error) {
     console.error(`Failed to fetch game data for ${userData.currentGameId}:`, error);
-    return {
-      currentGameId: userData.currentGameId,
-      liveGameData: null,
-      error: "Failed to fetch live game data."
-    };
+    throw new ApiError("Failed to fetch live game data.", 500);
   }
 }
 

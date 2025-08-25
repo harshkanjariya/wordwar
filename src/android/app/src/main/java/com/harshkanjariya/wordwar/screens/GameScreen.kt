@@ -1,5 +1,6 @@
 package com.harshkanjariya.wordwar.screens
 
+import PlayerInfoBottomSheet
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -22,6 +23,7 @@ import com.harshkanjariya.wordwar.data.getUserIdFromJwt
 import com.harshkanjariya.wordwar.network.service.CellCoordinatePayload
 import com.harshkanjariya.wordwar.network.service.ClaimedWordPayload
 import com.harshkanjariya.wordwar.network.service.GameActionPayload
+import com.harshkanjariya.wordwar.network.service.GameData
 import com.harshkanjariya.wordwar.network.service_holder.GameServiceHolder
 import com.harshkanjariya.wordwar.network.service_holder.isWordValid
 import kotlinx.coroutines.delay
@@ -71,6 +73,9 @@ fun GameScreen(navController: NavController, matchId: String?) {
     var turnTimestamp by remember { mutableLongStateOf(0L) }
     var remainingTime by remember { mutableIntStateOf(30) }
     var hasTriggeredTurnAdvance by remember { mutableStateOf(false) }
+
+    var activeGame by remember { mutableStateOf<GameData?>(null) }
+    var showPlayerSheet by remember { mutableStateOf(false) }
 
     DisposableEffect(matchId, userId) {
         if (matchId.isNullOrBlank() || userId.isBlank()) {
@@ -122,6 +127,15 @@ fun GameScreen(navController: NavController, matchId: String?) {
                         turnTimestamp = newTurnTimestamp
                         hasTriggeredTurnAdvance = false
                         isSubmitted = false
+
+                        scope.launch {
+                            try {
+                                val response = gameService.getActiveGame()
+                                activeGame = response.data?.gameData
+                            } catch (e: Exception) {
+                                println("Error fetching active game: ${e.message}")
+                            }
+                        }
                     }
                 }
             }
@@ -134,7 +148,6 @@ fun GameScreen(navController: NavController, matchId: String?) {
         onDispose { gameRef.removeEventListener(gameListener) }
     }
 
-    // --- Timer ---
     LaunchedEffect(turnTimestamp) {
         val initialTimeLeft = 30 - ((System.currentTimeMillis() - turnTimestamp) / 1000).toInt()
         remainingTime = initialTimeLeft.coerceAtLeast(0)
@@ -228,82 +241,104 @@ fun GameScreen(navController: NavController, matchId: String?) {
             }
         }
     ) { innerPadding ->
-        Column(
-            modifier = Modifier.fillMaxSize().padding(innerPadding).padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            GameHeader(
-                onBackClick = { navController.popBackStack() }
-            )
-            Spacer(Modifier.height(12.dp))
+        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                GameHeader(
+                    onBackClick = { navController.popBackStack() }
+                )
+                Spacer(Modifier.height(12.dp))
 
-            Text(text = if (userId == currentPlayer) "Your Turn!" else "Opponent's Turn", fontSize = 20.sp)
-            Spacer(Modifier.height(8.dp))
-            Text(text = "Phase: ${phase.name}", fontSize = 18.sp)
-            Text(text = "Time Left: $remainingTime s", fontSize = 24.sp)
-            Spacer(Modifier.height(16.dp))
+                Text(text = if (userId == currentPlayer) "Your Turn!" else "Opponent's Turn", fontSize = 20.sp)
+                Spacer(Modifier.height(8.dp))
+                Text(text = "Phase: ${phase.name}", fontSize = 18.sp)
+                Text(text = "Time Left: $remainingTime s", fontSize = 24.sp)
+                Spacer(Modifier.height(16.dp))
 
-            WordGrid(
-                gridSize = gridSize,
-                cells = cells,
-                currentMode = phase,
-                filledCell = filledCell.value,
-                highlightFilledCell = (phase == GamePhase.EDIT),
-                onCellClick = { index ->
-                    if (phase == GamePhase.EDIT && currentPlayer == userId && !isSubmitted) {
-                        if (cells[index].isBlank()) {
-                            isKeyboardVisible = true
-                            selectedCellIndexForInput = index
-                        } else if (index == filledCell.value?.index) {
-                            filledCell.value = null
+                WordGrid(
+                    gridSize = gridSize,
+                    cells = cells,
+                    currentMode = phase,
+                    filledCell = filledCell.value,
+                    highlightFilledCell = (phase == GamePhase.EDIT),
+                    onCellClick = { index ->
+                        if (phase == GamePhase.EDIT && currentPlayer == userId && !isSubmitted) {
+                            if (cells[index].isBlank()) {
+                                isKeyboardVisible = true
+                                selectedCellIndexForInput = index
+                            } else if (index == filledCell.value?.index) {
+                                filledCell.value = null
+                            }
+                        }
+                    },
+                    onCellsSelected = { newCells ->
+                        if (phase == GamePhase.SELECT) selectedCells = newCells
+                    },
+                    selectedCells = selectedCells
+                )
+                Spacer(Modifier.height(16.dp))
+
+                GameControls(
+                    onClaimWord = { },
+                    onEndGame = {
+                        scope.launch {
+                            gameRef.child("players").child(userId).child("status").onDisconnect().cancel()
+                            val result = GameServiceHolder.api.quitGame()
+                            if (result.status == 200 && result.data != null) {
+                                navController.popBackStack("menu", false)
+                            }
                         }
                     }
-                },
-                onCellsSelected = { newCells ->
-                    if (phase == GamePhase.SELECT) selectedCells = newCells
-                },
-                selectedCells = selectedCells
-            )
-            Spacer(Modifier.height(16.dp))
-
-            GameControls(
-                onClaimWord = { /* handled by FAB */ },
-                onEndGame = {
-                    scope.launch {
-                        gameRef.child("players").child(userId).child("status").onDisconnect().cancel()
-                        val result = GameServiceHolder.api.quitGame()
-                        if (result.status == 200 && result.data != null) {
-                            navController.popBackStack("menu", false)
-                        }
-                    }
+                )
+                Spacer(Modifier.height(16.dp))
+                ClaimedWordsList(claimedWords = claimedWords)
+                Button(
+                    onClick = { showPlayerSheet = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("View Players")
                 }
-            )
-            Spacer(Modifier.height(16.dp))
-            ClaimedWordsList(claimedWords = claimedWords)
-        }
-    }
+            }
 
-    if (isKeyboardVisible) {
-        Box(
-            modifier = Modifier.fillMaxSize().clickable {
-                isKeyboardVisible = false
-                selectedCellIndexForInput = -1
-            }.background(Color.Black.copy(alpha = 0.5f)),
-            contentAlignment = Alignment.BottomCenter
-        ) {
-            CustomKeyboard(
-                onBackspaceClicked = { filledCell.value = null },
-                onCharClicked = { char ->
-                    scope.launch {
-                        if (selectedCellIndexForInput != -1 && userId == currentPlayer) {
-                            filledCell.value = Cell(index = selectedCellIndexForInput, char = char)
-                        }
-                        isKeyboardVisible = false
-                        selectedCellIndexForInput = -1
-                    }
-                },
-                modifier = Modifier.clickable { /* consume click */ }
-            )
+            if (isKeyboardVisible) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(250.dp)
+                        .align(Alignment.BottomCenter)
+                        .background(Color.Black.copy(alpha = 0.5f))
+                        .clickable { isKeyboardVisible = false; selectedCellIndexForInput = -1 },
+                    contentAlignment = Alignment.BottomCenter
+                ) {
+                    CustomKeyboard(
+                        onBackspaceClicked = { filledCell.value = null },
+                        onCharClicked = { char ->
+                            scope.launch {
+                                if (selectedCellIndexForInput != -1 && userId == currentPlayer) {
+                                    filledCell.value = Cell(index = selectedCellIndexForInput, char = char)
+                                }
+                                isKeyboardVisible = false
+                                selectedCellIndexForInput = -1
+                            }
+                        },
+                        modifier = Modifier.align(Alignment.BottomCenter)
+                    )
+                }
+            }
+
+            activeGame?.let { game ->
+                if (showPlayerSheet) {
+                    PlayerInfoBottomSheet(
+                        activeGame = game,
+                        showSheet = showPlayerSheet,
+                        onDismiss = { showPlayerSheet = false },
+                    )
+                }
+            }
         }
     }
 }

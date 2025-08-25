@@ -4,12 +4,25 @@ import com.harshkanjariya.wordwar.data.ApiResponse
 import retrofit2.http.Body
 import retrofit2.http.POST
 import retrofit2.http.GET
-import retrofit2.http.Header
 import retrofit2.http.Path
+
+data class PlayerDto(
+    val _id: String,
+    val name: String,
+    val joinedAt: String?,
+    val claimedWords: List<String>
+)
+
+data class GameData(
+    val createdAt: String,
+    val updatedAt: String,
+    val cellData: List<List<String>>,
+    val players: List<PlayerDto>
+)
 
 data class ActiveGameResponse(
     val currentGameId: String? = null,
-    val liveGameData: Map<String, Any>? = null
+    val gameData: GameData? = null,
 )
 
 data class CellCoordinatePayload(
