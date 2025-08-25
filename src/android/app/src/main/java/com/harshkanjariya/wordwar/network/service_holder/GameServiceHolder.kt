@@ -1,7 +1,8 @@
-package com.harshkanjariya.wordwar.network
+package com.harshkanjariya.wordwar.network.service_holder
 
-import com.google.firebase.auth.FirebaseAuth
 import com.harshkanjariya.wordwar.BuildConfig
+import com.harshkanjariya.wordwar.network.ApiClient
+import com.harshkanjariya.wordwar.network.service.GameService
 
 object GameServiceHolder {
     private const val BASE_URL = BuildConfig.BACKEND_URL

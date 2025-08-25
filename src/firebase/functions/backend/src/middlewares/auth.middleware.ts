@@ -4,7 +4,7 @@ import {getCachedUser} from "../services/users/users";
 import jwt from "jsonwebtoken";
 import {checkCurrentEmailVerified} from "../utils/user-utils";
 import {User} from "../types";
-import {FullDocument} from "../types/api"; // Assuming you're using a JWT package like `jsonwebtoken`
+import {FullDocument} from "../types/api";
 
 export const authMiddleware = async (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;

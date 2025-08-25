@@ -22,6 +22,7 @@ import com.harshkanjariya.wordwar.screens.AuthScreen
 import com.harshkanjariya.wordwar.screens.GameScreen
 import com.harshkanjariya.wordwar.screens.MatchmakingOptionsScreen
 import com.harshkanjariya.wordwar.screens.MenuScreen
+import com.harshkanjariya.wordwar.screens.ProfileScreen
 import com.harshkanjariya.wordwar.screens.QueueScreen
 import com.harshkanjariya.wordwar.ui.theme.WordWarTheme
 
@@ -47,6 +48,7 @@ class MainActivity : ComponentActivity() {
                             composable("auth") { AuthScreen(navController) }
                             composable("menu") { MenuScreen(navController) }
                             composable("matchmaking_options") { MatchmakingOptionsScreen(navController) }
+                            composable("profile") { ProfileScreen(navController) }
                             composable("queue/{matchSize}", arguments = listOf(navArgument("matchSize") { type = NavType.IntType })) { backStackEntry ->
                                 val matchSize = backStackEntry.arguments?.getInt("matchSize") ?: 3
                                 QueueScreen(navController, matchSize)

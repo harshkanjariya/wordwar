@@ -1,6 +1,8 @@
-package com.harshkanjariya.wordwar.network
+package com.harshkanjariya.wordwar.network.service_holder
 
 import com.harshkanjariya.wordwar.BuildConfig
+import com.harshkanjariya.wordwar.network.ApiClient
+import com.harshkanjariya.wordwar.network.service.AuthService
 
 object AuthServiceHolder {
     val api: AuthService by lazy {

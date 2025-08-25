@@ -1,17 +1,13 @@
 package com.harshkanjariya.wordwar.screens
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -21,21 +17,27 @@ import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.functions.FirebaseFunctions
 import com.harshkanjariya.wordwar.components.ClaimedWordsList
-import com.harshkanjariya.wordwar.components.FillCellDialog
+import com.harshkanjariya.wordwar.components.CustomKeyboard
 import com.harshkanjariya.wordwar.components.GameControls
 import com.harshkanjariya.wordwar.components.GameHeader
 import com.harshkanjariya.wordwar.components.WordGrid
 import com.harshkanjariya.wordwar.data.LocalStorage
 import com.harshkanjariya.wordwar.data.getUserIdFromJwt
-import com.harshkanjariya.wordwar.network.isWordValid
+import com.harshkanjariya.wordwar.network.service_holder.isWordValid
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import androidx.activity.compose.BackHandler
 
 enum class GameMode {
     FILLING,
     SELECTION
 }
+
+data class Cell(
+    val index: Int,
+    val char: String
+)
 
 @Composable
 fun GameScreen(navController: NavController, matchId: String?) {
@@ -43,9 +45,9 @@ fun GameScreen(navController: NavController, matchId: String?) {
     val gridSize = 10
     val cells = remember { mutableStateListOf<String>().apply { addAll(List(gridSize * gridSize) { "" }) } }
     var currentMode by remember { mutableStateOf(GameMode.FILLING) }
-    var showFillDialog by remember { mutableStateOf(false) }
-    var cellToFillIndex by remember { mutableIntStateOf(-1) }
-    var characterInput by remember { mutableStateOf("") }
+    var isKeyboardVisible by remember { mutableStateOf(false) }
+    var selectedCellIndexForInput by remember { mutableIntStateOf(-1) }
+    val filledCell = remember { mutableStateOf<Cell?>(null) }
     var claimedWords by remember { mutableStateOf(listOf<String>()) }
     var selectedCells by remember { mutableStateOf(emptySet<Int>()) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -63,12 +65,12 @@ fun GameScreen(navController: NavController, matchId: String?) {
         }
     }
 
-    // New state variables for game logic and timer
     var currentPlayer by remember { mutableStateOf("") }
     var turnTimestamp by remember { mutableLongStateOf(0L) }
     var remainingTime by remember { mutableIntStateOf(30) }
     var hasTriggeredTurnAdvance by remember { mutableStateOf(false) }
 
+    // Firebase listener and timer logic remain the same as before...
     // Live Firebase Listener
     DisposableEffect(matchId, userId) {
         if (matchId.isNullOrBlank() || userId.isNullOrBlank()) {
@@ -85,11 +87,9 @@ fun GameScreen(navController: NavController, matchId: String?) {
                 val gameData = snapshot.value as? Map<String, Any>
                 val players = gameData?.get("players") as? Map<String, Any>
 
-                // Get the current player and turn timestamp from the server
                 val newCurrentPlayer = gameData?.get("currentPlayer") as? String ?: ""
                 val newTurnTimestamp = gameData?.get("turnTimestamp") as? Long ?: 0L
 
-                // Update state variables
                 currentPlayer = newCurrentPlayer
                 if (newTurnTimestamp != turnTimestamp) {
                     turnTimestamp = newTurnTimestamp
@@ -122,7 +122,6 @@ fun GameScreen(navController: NavController, matchId: String?) {
     }
 
 
-    // Timer logic to run whenever the turnTimestamp updates
     LaunchedEffect(turnTimestamp) {
         val initialTimeLeft = 30 - ((System.currentTimeMillis() - turnTimestamp) / 1000).toInt()
         remainingTime = initialTimeLeft.coerceAtLeast(0)
@@ -134,7 +133,6 @@ fun GameScreen(navController: NavController, matchId: String?) {
             }
         }
 
-        // Trigger the Firebase Function when the timer hits zero
         if (remainingTime <= 0 && !hasTriggeredTurnAdvance && userId == currentPlayer) {
             hasTriggeredTurnAdvance = true
             scope.launch {
@@ -151,11 +149,17 @@ fun GameScreen(navController: NavController, matchId: String?) {
         }
     }
 
+    // New: BackHandler to close keyboard on back press
+    BackHandler(enabled = isKeyboardVisible) {
+        isKeyboardVisible = false
+        selectedCellIndexForInput = -1
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
     ) { innerPadding ->
         Column(
-            Modifier
+            modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .padding(16.dp),
@@ -166,39 +170,33 @@ fun GameScreen(navController: NavController, matchId: String?) {
                 onToggleMode = {
                     currentMode = if (currentMode == GameMode.FILLING) GameMode.SELECTION else GameMode.FILLING
                     selectedCells = emptySet()
+                    isKeyboardVisible = false // Hide keyboard when mode changes
                 },
                 onBackClick = { navController.popBackStack() }
             )
             Spacer(Modifier.height(12.dp))
 
-            // Display turn info and timer
-            Text(
-                text = if (userId == currentPlayer) "Your Turn!" else "Opponent's Turn",
-                fontSize = 20.sp
-            )
+            Text(text = if (userId == currentPlayer) "Your Turn!" else "Opponent's Turn", fontSize = 20.sp)
             Spacer(Modifier.height(8.dp))
-            Text(
-                text = "Time Left: $remainingTime s",
-                fontSize = 24.sp
-            )
+            Text(text = "Time Left: $remainingTime s", fontSize = 24.sp)
             Spacer(Modifier.height(16.dp))
 
             WordGrid(
                 gridSize = gridSize,
                 cells = cells,
                 currentMode = currentMode,
+                filledCell = filledCell.value,
+                highlightFilledCell = currentMode == GameMode.FILLING,
                 onCellClick = { index ->
-                    // Only allow filling a cell if it's the current player's turn and the cell is empty
-                    if (userId == currentPlayer && currentMode == GameMode.FILLING) {
+                    if (currentMode == GameMode.FILLING) {
                         if (cells[index].isBlank()) {
-                            cellToFillIndex = index
-                            showFillDialog = true
+                            isKeyboardVisible = true
+                            selectedCellIndexForInput = index
+                        } else if (index == filledCell.value?.index) {
+                            filledCell.value = null
                         }
                     } else {
-                        // Optionally show a message if it's not their turn
-                        scope.launch {
-                            snackbarHostState.showSnackbar("It's not your turn.")
-                        }
+                        scope.launch { snackbarHostState.showSnackbar("It's not your turn.") }
                     }
                 },
                 onCellsSelected = { newCells -> selectedCells = newCells },
@@ -209,7 +207,6 @@ fun GameScreen(navController: NavController, matchId: String?) {
             GameControls(
                 onClaimWord = {
                     scope.launch {
-                        // Only allow claiming if it's the current player's turn
                         if (userId == currentPlayer && currentMode == GameMode.SELECTION && selectedCells.isNotEmpty()) {
                             val claimedWord = buildString { selectedCells.sorted().forEach { index -> append(cells[index]) } }
                             if (claimedWord.isNotBlank()) {
@@ -232,37 +229,47 @@ fun GameScreen(navController: NavController, matchId: String?) {
             Spacer(Modifier.height(16.dp))
             ClaimedWordsList(claimedWords = claimedWords)
         }
+    }
 
-        if (showFillDialog) {
-            FillCellDialog(
-                onDismiss = { showFillDialog = false; characterInput = "" },
-                onConfirm = {
-                    // Only confirm and send to Firebase if it's the current player's turn
-                    if (userId == currentPlayer && characterInput.isNotBlank()) {
-                        scope.launch {
-                            // Update Firebase with the move
-                            if (!matchId.isNullOrBlank() && !userId.isNullOrBlank()) {
-                                val moveRef = gameRef.child("players").child(userId).child("actions").push()
-                                val moveData = mapOf(
-                                    "row" to cellToFillIndex / gridSize,
-                                    "col" to cellToFillIndex % gridSize,
-                                    "char" to characterInput,
-                                    "timestamp" to System.currentTimeMillis()
-                                )
-                                runCatching { moveRef.setValue(moveData).await() }
-                                    .onFailure { snackbarHostState.showSnackbar("Failed to send move: ${it.message}") }
-                            }
+    if (isKeyboardVisible) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable(
+                    onClick = {
+                        isKeyboardVisible = false
+                        selectedCellIndexForInput = -1
+                    }
+                )
+                .background(Color.Black.copy(alpha = 0.5f)),
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            CustomKeyboard(
+                onBackspaceClicked = {
+                    filledCell.value = null
+                },
+                onCharClicked = { char ->
+                    scope.launch {
+                        if (selectedCellIndexForInput != -1 && userId == currentPlayer) {
+                            filledCell.value = Cell(
+                                index = selectedCellIndexForInput,
+                                char = char
+                            )
+//                            val moveData = mapOf(
+//                                "row" to selectedCellIndexForInput / gridSize,
+//                                "col" to selectedCellIndexForInput % gridSize,
+//                                "char" to char,
+//                                "timestamp" to System.currentTimeMillis()
+//                            )
+//                            val moveRef = gameRef.child("players").child(userId).child("actions").push()
+//                            runCatching { moveRef.setValue(moveData).await() }
+//                                .onFailure { snackbarHostState.showSnackbar("Failed to send move: ${it.message}") }
                         }
-                        showFillDialog = false
-                        characterInput = ""
+                        isKeyboardVisible = false
+                        selectedCellIndexForInput = -1
                     }
                 },
-                characterInput = characterInput,
-                onCharacterInputChange = { newValue ->
-                    if (newValue.length <= 1 && newValue.all { it.isLetter() }) {
-                        characterInput = newValue.uppercase()
-                    }
-                }
+                modifier = Modifier.clickable(onClick = { /* consume click to prevent parent from closing */ })
             )
         }
     }

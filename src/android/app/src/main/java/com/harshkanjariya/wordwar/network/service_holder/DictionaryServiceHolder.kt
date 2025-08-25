@@ -1,5 +1,7 @@
-package com.harshkanjariya.wordwar.network
+package com.harshkanjariya.wordwar.network.service_holder
 
+import com.harshkanjariya.wordwar.network.ApiClient
+import com.harshkanjariya.wordwar.network.service.DictionaryApiService
 import retrofit2.HttpException
 import java.io.IOException
 

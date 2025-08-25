@@ -1,5 +1,7 @@
 import {Request, Response, Router} from "express";
-import {createLiveGame} from "../services/game";
+import {createLiveGame, performGameAction} from "../services/game";
+import {validationAndPermissionMiddleware} from "../middlewares/validation-permission.middleware";
+import {GameAction} from "../dtos/game";
 
 export const autoPrefix = "/game";
 
@@ -21,6 +23,15 @@ gameRoutes.post("/start_game",
     // @ts-ignore
     delete game.cellData;
     res.send(game);
+  }
+);
+
+gameRoutes.post("/submit_action",
+  validationAndPermissionMiddleware(GameAction),
+  async (req: Request, res: Response) => {
+    const user = req.user;
+    const result = await performGameAction(user, req.body);
+    res.send(result);
   }
 );
 

@@ -15,7 +15,7 @@ import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.harshkanjariya.wordwar.components.GoogleSignInButton
 import com.harshkanjariya.wordwar.data.LocalStorage
-import com.harshkanjariya.wordwar.network.AuthServiceHolder
+import com.harshkanjariya.wordwar.network.service_holder.AuthServiceHolder
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.tasks.await

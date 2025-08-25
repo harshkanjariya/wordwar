@@ -21,7 +21,7 @@ fun MatchmakingOptionsScreen(navController: NavController) {
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "Select Number of Players",
+                text = "Number of Players",
                 style = MaterialTheme.typography.headlineMedium
             )
             Spacer(Modifier.height(32.dp))

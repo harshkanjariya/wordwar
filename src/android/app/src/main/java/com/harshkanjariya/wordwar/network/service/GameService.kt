@@ -1,4 +1,4 @@
-package com.harshkanjariya.wordwar.network
+package com.harshkanjariya.wordwar.network.service
 
 import retrofit2.http.Body
 import retrofit2.http.POST

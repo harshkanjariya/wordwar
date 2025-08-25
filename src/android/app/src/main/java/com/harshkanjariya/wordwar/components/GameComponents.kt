@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.harshkanjariya.wordwar.screens.Cell
 import com.harshkanjariya.wordwar.screens.GameMode
 import com.harshkanjariya.wordwar.util.darker
 import com.harshkanjariya.wordwar.util.getCellsInPath
@@ -81,6 +82,8 @@ fun WordGrid(
     currentMode: GameMode,
     onCellClick: (Int) -> Unit,
     onCellsSelected: (Set<Int>) -> Unit,
+    filledCell: Cell?,
+    highlightFilledCell: Boolean,
     selectedCells: Set<Int>
 ) {
     val scope = rememberCoroutineScope()
@@ -138,7 +141,7 @@ fun WordGrid(
                 Row {
                     repeat(gridSize) { c ->
                         val index = r * gridSize + c
-                        val isSelected = selectedCells.contains(index)
+                        val isSelected = selectedCells.contains(index) || (filledCell?.index == index && highlightFilledCell)
                         val backgroundColor = if (isSelected) Color(0xFF3F51B5).darker() else Color(0xFFEAEAEA)
                         val textColor = if (isSelected) Color.White else Color.Black
                         Box(
@@ -152,7 +155,7 @@ fun WordGrid(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = cells.getOrNull(index) ?: "",
+                                text = if (filledCell?.index == index && filledCell.char.isNotBlank()) filledCell.char else cells.getOrNull(index) ?: "",
                                 textAlign = TextAlign.Center,
                                 style = MaterialTheme.typography.bodySmall.copy(color = textColor)
                             )
