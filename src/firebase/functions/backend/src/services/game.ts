@@ -124,21 +124,29 @@ export async function performGameAction(user: FullDocument<User>, body: GameActi
       throw new ApiError("Invalid character", 400);
     }
 
-    // Apply edit
     liveGame.cellData[row][col] = character;
     await gameRef.child(`cellData/${row}/${col}`).set(character);
+
+    const filledCount = liveGame.cellData
+      .flat()
+      .filter((c: any) => c != null && c !== "").length;
+
+    if (filledCount >= 3) {
+      await gameRef.child("phase").set("SELECT");
+    } else {
+      triggerAdvanceTurn(userData.currentGameId.toString());
+    }
+
     await repositories.live_games.updateOne({
       _id: userData.currentGameId,
     }, {
       cellData: liveGame.cellData,
     });
-  } else if (phase === "SELECTION") {
-    // Must provide claimedWords only
+  } else if (phase === "SELECT") {
     if (!body.claimedWords || !Array.isArray(body.claimedWords) || body.claimedWords.length === 0) {
       throw new ApiError("You must provide claimedWords in SELECTION phase", 400);
     }
 
-    // Example validation
     for (const word of body.claimedWords) {
       if (!word.word || !Array.isArray(word.cellCoordinates)) {
         throw new ApiError("Invalid claimed word format", 400);
@@ -153,16 +161,13 @@ export async function performGameAction(user: FullDocument<User>, body: GameActi
     }, {
       claimedWords: existingClaimed,
     });
+    triggerAdvanceTurn(userData.currentGameId.toString());
   } else {
     throw new ApiError(`Unsupported game phase: ${phase}`, 400);
   }
 
-  // After processing, trigger next turn
-  triggerAdvanceTurn(userData.currentGameId.toString());
-
   return { success: true };
 }
-
 
 export async function getCurrentGameInfo(user: FullDocument<User>) {
   const userData = await repositories.users.findOne({filter: {_id: user._id}});
@@ -213,7 +218,6 @@ export async function getCurrentGameInfo(user: FullDocument<User>) {
     };
   }
 }
-
 
 export async function getGameInfo(user: FullDocument<User>, gameId: string) {
   const userData = await repositories.users.findOne({filter: {_id: user._id}});
@@ -300,8 +304,8 @@ export async function endGame(gameId: string) {
       { session }
     );
 
-    await repositories.live_games.deleteOne(
-      { filter: { _id: ObjectId.createFromHexString(gameId) } },
+    const result = await repositories.live_games.deleteOne(
+      { _id: ObjectId.createFromHexString(gameId) },
       { session }
     );
 

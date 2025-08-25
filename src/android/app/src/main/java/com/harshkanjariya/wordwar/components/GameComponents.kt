@@ -17,7 +17,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.harshkanjariya.wordwar.screens.Cell
-import com.harshkanjariya.wordwar.screens.GameMode
+import com.harshkanjariya.wordwar.screens.GamePhase
 import com.harshkanjariya.wordwar.util.darker
 import com.harshkanjariya.wordwar.util.getCellsInPath
 import kotlinx.coroutines.FlowPreview
@@ -28,8 +28,6 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun GameHeader(
-    currentMode: GameMode,
-    onToggleMode: () -> Unit,
     onBackClick: () -> Unit
 ) {
     Row(
@@ -38,9 +36,6 @@ fun GameHeader(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = onToggleMode) {
-                Text(if (currentMode == GameMode.FILLING) "Select Mode" else "Fill Mode")
-            }
             OutlinedButton(onClick = onBackClick) { Text("Back") }
         }
     }
@@ -79,7 +74,7 @@ fun ClaimedWordsList(claimedWords: List<String>) {
 fun WordGrid(
     gridSize: Int,
     cells: SnapshotStateList<String>,
-    currentMode: GameMode,
+    currentMode: GamePhase,
     onCellClick: (Int) -> Unit,
     onCellsSelected: (Set<Int>) -> Unit,
     filledCell: Cell?,
@@ -95,7 +90,7 @@ fun WordGrid(
             .fillMaxWidth()
             .pointerInput(currentMode) {
                 val totalCellSizePx = (size.width.toFloat() / gridSize)
-                if (currentMode == GameMode.SELECTION) {
+                if (currentMode == GamePhase.SELECT) {
                     scope.launch {
                         snapshotFlow { dragState.value }
                             .filter { it != Offset.Unspecified }
@@ -149,7 +144,7 @@ fun WordGrid(
                                 .size(32.dp)
                                 .padding(2.dp)
                                 .background(backgroundColor)
-                                .then(if (currentMode == GameMode.FILLING) {
+                                .then(if (currentMode == GamePhase.EDIT) {
                                     Modifier.clickable { onCellClick(index) }
                                 } else Modifier),
                             contentAlignment = Alignment.Center

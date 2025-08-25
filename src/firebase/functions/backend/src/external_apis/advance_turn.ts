@@ -48,6 +48,7 @@ export async function triggerAdvanceTurn(gameId: string) {
 
     gameData.currentPlayer = getNextPlayerId(players, currentPlayerId);
     gameData.turnTimestamp = now;
+    gameData.phase = "EDIT";
     gameData.selectedCell = "";
 
     updateSuccessful = true;

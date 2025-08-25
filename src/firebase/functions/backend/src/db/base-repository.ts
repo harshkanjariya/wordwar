@@ -93,13 +93,10 @@ export class BaseRepository<T extends Document> {
     options?: { session?: ClientSession },
   ): Promise<FullDocument<T> | null> {
     const now = new Date();
-    return (await this.collection.findOneAndUpdate(
+    return (await this.collection.updateMany(
       filter as any,
       updates,
-      {
-        returnDocument: "after",
-        ...options,
-      }
+      {...options}
     )) as any as FullDocument<T>;
   }
 

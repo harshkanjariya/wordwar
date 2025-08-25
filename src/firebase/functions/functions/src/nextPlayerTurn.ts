@@ -34,6 +34,7 @@ export const advanceTurn = onCall(async (request) => {
 
     gameData.currentPlayer = getNextPlayerId(players, currentPlayerId);
     gameData.turnTimestamp = now;
+    gameData.phase = "EDIT";
     gameData.selectedCell = "";
 
     // This flag helps us know if the transaction was committed.

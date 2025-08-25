@@ -3,48 +3,20 @@ package com.harshkanjariya.wordwar.screens
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ThumbUp
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
+import com.google.firebase.database.*
 import com.google.firebase.functions.FirebaseFunctions
-import com.harshkanjariya.wordwar.components.ClaimedWordsList
-import com.harshkanjariya.wordwar.components.CustomKeyboard
-import com.harshkanjariya.wordwar.components.GameControls
-import com.harshkanjariya.wordwar.components.GameHeader
-import com.harshkanjariya.wordwar.components.WordGrid
+import com.harshkanjariya.wordwar.components.*
 import com.harshkanjariya.wordwar.data.LocalStorage
 import com.harshkanjariya.wordwar.data.getUserIdFromJwt
 import com.harshkanjariya.wordwar.network.service.CellCoordinatePayload
@@ -56,11 +28,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
-enum class GameMode {
-    FILLING,
-    SELECTION
-}
-
 data class Cell(
     val index: Int,
     val char: String
@@ -68,6 +35,11 @@ data class Cell(
 
 enum class GamePhase {
     EDIT, SELECT
+}
+
+fun phaseStringToEnum(phase: String?): GamePhase {
+    if (phase != null && phase.uppercase() == "SELECT") return GamePhase.SELECT
+    return GamePhase.EDIT
 }
 
 @Composable
@@ -95,7 +67,7 @@ fun GameScreen(navController: NavController, matchId: String?) {
     }
 
     var currentPlayer by remember { mutableStateOf("") }
-    var phase by remember { mutableStateOf(GamePhase.EDIT) } // 🔥 new
+    var phase by remember { mutableStateOf(GamePhase.EDIT) }
     var turnTimestamp by remember { mutableLongStateOf(0L) }
     var remainingTime by remember { mutableIntStateOf(30) }
     var hasTriggeredTurnAdvance by remember { mutableStateOf(false) }
@@ -136,9 +108,15 @@ fun GameScreen(navController: NavController, matchId: String?) {
 
                     currentPlayer = gameData?.get("currentPlayer") as? String ?: ""
                     val newTurnTimestamp = gameData?.get("turnTimestamp") as? Long ?: 0L
-                    val newPhase = (gameData?.get("phase") as? String ?: "edit").uppercase()
+                    val newPhase = phaseStringToEnum(gameData?.get("phase") as? String)
 
-                    phase = if (newPhase == "SELECT") GamePhase.SELECT else GamePhase.EDIT
+                    if (phase != newPhase) {
+                        phase = newPhase
+                    }
+
+                    selectedCellIndexForInput = -1
+                    filledCell.value = null
+                    selectedCells = emptySet()
 
                     if (newTurnTimestamp != turnTimestamp) {
                         turnTimestamp = newTurnTimestamp
@@ -166,7 +144,7 @@ fun GameScreen(navController: NavController, matchId: String?) {
             remainingTime--
         }
 
-        if (remainingTime <= 0 && !hasTriggeredTurnAdvance && userId == currentPlayer) {
+        if (!hasTriggeredTurnAdvance && userId == currentPlayer) {
             hasTriggeredTurnAdvance = true
             scope.launch {
                 try {
@@ -205,7 +183,6 @@ fun GameScreen(navController: NavController, matchId: String?) {
                                     )
                                     try {
                                         gameService.submitAction(payload)
-                                        isSubmitted = true
                                     } catch (e: Exception) {
                                         snackbarHostState.showSnackbar("Failed: ${e.message}")
                                     }
@@ -256,8 +233,6 @@ fun GameScreen(navController: NavController, matchId: String?) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             GameHeader(
-                currentMode = if (phase == GamePhase.EDIT) GameMode.FILLING else GameMode.SELECTION,
-                onToggleMode = {}, // 🔒 No manual toggle anymore
                 onBackClick = { navController.popBackStack() }
             )
             Spacer(Modifier.height(12.dp))
@@ -271,7 +246,7 @@ fun GameScreen(navController: NavController, matchId: String?) {
             WordGrid(
                 gridSize = gridSize,
                 cells = cells,
-                currentMode = if (phase == GamePhase.EDIT) GameMode.FILLING else GameMode.SELECTION,
+                currentMode = phase,
                 filledCell = filledCell.value,
                 highlightFilledCell = (phase == GamePhase.EDIT),
                 onCellClick = { index ->
