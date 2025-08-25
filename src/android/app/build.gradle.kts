@@ -29,7 +29,7 @@ android {
             }
             create("staging") {
                 dimension = "env"
-                buildConfigField("String", "BACKEND_URL", "\"https://asia-south1-xkartindia.cloudfunctions.net/api/\"")
+                buildConfigField("String", "BACKEND_URL", "\"https://word-war-4.web.app/api/\"")
             }
             create("production") {
                 dimension = "env"

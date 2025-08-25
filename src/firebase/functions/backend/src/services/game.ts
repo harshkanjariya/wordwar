@@ -6,6 +6,7 @@ import {FullDocument} from "../types/api";
 import {GameHistory, LiveGame} from "../types/game";
 import {ApiError} from "../bootstrap/errors";
 import {firebaseDatabase} from "../utils/firebase";
+import {triggerAdvanceTurn} from "../external_apis/advance_turn";
 
 export async function createLiveGame(body: any) {
   const session = await repositories.startTransaction();
@@ -47,48 +48,103 @@ export async function createLiveGame(body: any) {
 }
 
 export async function performGameAction(user: FullDocument<User>, body: GameAction) {
-  if (!body.isValid()) {
+  if (!body?.isValid()) {
     throw new ApiError("Invalid action", 400);
   }
 
-  const userData = await repositories.users.findOne({filter: {_id: user._id}});
-  if (!userData?.currentGameId) {
+  const userData = await repositories.users.findOne({ filter: { _id: user._id } });
+  if (!userData) {
+    throw new ApiError("User not found", 404);
+  }
+
+  if (!userData.currentGameId) {
     throw new ApiError("You're not in any active game!", 400);
   }
 
   const gameRef = firebaseDatabase.ref(`live_games/${userData.currentGameId}`);
-
-  const snapshot = await gameRef.once('value');
+  const snapshot = await gameRef.once("value");
   const liveGame = snapshot.val();
+
+  if (!liveGame) {
+    throw new ApiError("Game not found", 404);
+  }
 
   if (liveGame.currentPlayer !== user._id.toString()) {
     throw new ApiError("It's not your turn", 400);
   }
 
-  if (body.character) {
-    const cellData = liveGame.cellData;
-    cellData[body.row as any][body.col as any] = body.character;
-    await gameRef.child("cellData/" + body.row + "/" + body.col).set(body.character);
+  if (!liveGame.cellData || !Array.isArray(liveGame.cellData)) {
+    const BOARD_ROWS = 10;
+    const BOARD_COLS = 10;
+
+    liveGame.cellData = Array.from({ length: BOARD_ROWS }, () =>
+      Array.from({ length: BOARD_COLS }, () => null)
+    );
+
+    await gameRef.child("cellData").set(liveGame.cellData);
   }
 
-  return {};
+  if (body.character != null) {
+    const { row, col, character } = body;
+
+    if (
+      typeof row !== "number" ||
+      typeof col !== "number" ||
+      row < 0 ||
+      col < 0 ||
+      row >= liveGame.cellData.length ||
+      col >= liveGame.cellData[row].length
+    ) {
+      throw new ApiError("Invalid cell coordinates", 400);
+    }
+
+    // validate character if you have rules
+    if (typeof character !== "string" || character.length !== 1) {
+      throw new ApiError("Invalid character", 400);
+    }
+
+    // apply action
+    liveGame.cellData[row][col] = character;
+    await gameRef.child(`cellData/${row}/${col}`).set(character);
+  }
+
+  triggerAdvanceTurn(userData.currentGameId.toString());
+
+  return { success: true };
 }
+
 
 export async function getCurrentGameInfo(user: FullDocument<User>) {
   const userData = await repositories.users.findOne({filter: {_id: user._id}});
-  if (!userData?.currentGameId) {
-    return {
-      currentGameId: null,
-      liveGameData: null,
-    };
+
+  if (!userData) {
+    throw new ApiError("User not found", 404);
   }
 
-  const gameRef = firebaseDatabase.ref(`live_games/${userData.currentGameId}`);
+  let currentGameId = userData?.currentGameId ?? null;
+  let liveGameData: any = null;
+
+  if (!currentGameId) {
+    const gamesSnapshot = await firebaseDatabase.ref("live_games").once("value");
+    const allGames = gamesSnapshot.val() || {};
+
+    for (const [gameId, game] of Object.entries<any>(allGames)) {
+      if (game?.players?.includes?.(user._id.toString())) {
+        currentGameId = ObjectId.createFromHexString(gameId);
+        liveGameData = game;
+        break;
+      }
+    }
+
+    if (!currentGameId) {
+      return {
+        currentGameId: null,
+        liveGameData: null,
+      };
+    }
+  }
 
   try {
-    const snapshot = await gameRef.once('value');
-    const liveGameData = snapshot.val();
-
     const dbGameData = await repositories.live_games.findOne({filter: {_id: userData.currentGameId}});
 
     return {
@@ -195,7 +251,6 @@ export async function endGame(gameId: string) {
 
     await session.commitTransaction();
 
-    console.log("removed game");
     return {success: true};
   } catch (error) {
     await session.abortTransaction();

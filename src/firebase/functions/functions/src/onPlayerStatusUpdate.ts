@@ -1,6 +1,5 @@
 import {onValueUpdated} from "firebase-functions/database";
-import {Player} from "./types";
-import * as admin from "firebase-admin";
+import {admin, Player} from "./types";
 import fetch from "node-fetch";
 
 export const onPlayerStatusChange = onValueUpdated(
@@ -19,11 +18,6 @@ export const onPlayerStatusChange = onValueUpdated(
 
     if (!gameData) {
       console.log(`[END] Game ${gameId} not found. Aborting.`);
-      return;
-    }
-
-    if (gameData.endgameTriggered) {
-      console.log(`[END] Endgame already triggered for game ${gameId}. Aborting.`);
       return;
     }
 
@@ -52,8 +46,6 @@ export const onPlayerStatusChange = onValueUpdated(
           console.error(`[ERROR] End game API call failed with status: ${response.status}, message: ${errorText}`);
           return;
         }
-
-        await gameRef.child("endgameTriggered").set(true);
       } catch (error) {
         console.error(`[ERROR] Failed to call end game API for ${gameId}:`, error);
       }

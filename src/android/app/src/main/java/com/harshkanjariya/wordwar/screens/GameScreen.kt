@@ -80,6 +80,7 @@ fun GameScreen(navController: NavController, matchId: String?) {
     var selectedCells by remember { mutableStateOf(emptySet<Int>()) }
     val snackbarHostState = remember { SnackbarHostState() }
     val isNavigatingToResults = remember { mutableStateOf(false) }
+    var isSubmitted by remember { mutableStateOf(false) }
 
     val database = FirebaseDatabase.getInstance()
     val gameRef = database.getReference("live_games").child(matchId ?: "")
@@ -146,6 +147,7 @@ fun GameScreen(navController: NavController, matchId: String?) {
                     if (newTurnTimestamp != turnTimestamp) {
                         turnTimestamp = newTurnTimestamp
                         hasTriggeredTurnAdvance = false
+                        isSubmitted = false
                     }
                 }
             }
@@ -194,7 +196,7 @@ fun GameScreen(navController: NavController, matchId: String?) {
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         floatingActionButton = {
-            if (userId == currentPlayer) {
+            if (userId == currentPlayer && !isSubmitted) {
                 FloatingActionButton(
                     onClick = {
                         scope.launch {
@@ -246,6 +248,7 @@ fun GameScreen(navController: NavController, matchId: String?) {
 
                                 try {
                                     gameService.submitAction(payload)
+                                    isSubmitted = true
                                 } catch (e: Exception) {
                                     snackbarHostState.showSnackbar("Failed to submit action: ${e.message}")
                                 }
@@ -294,7 +297,7 @@ fun GameScreen(navController: NavController, matchId: String?) {
                 filledCell = filledCell.value,
                 highlightFilledCell = currentMode == GameMode.FILLING,
                 onCellClick = { index ->
-                    if (currentPlayer == userId && currentMode == GameMode.FILLING) {
+                    if (currentPlayer == userId && currentMode == GameMode.FILLING && !isSubmitted) {
                         if (cells[index].isBlank()) {
                             isKeyboardVisible = true
                             selectedCellIndexForInput = index
