@@ -17,8 +17,22 @@ export async function createLiveGame(body: any) {
     joinedAt[player] = body.players[player].timestamp;
   })
 
+  const userIds = Object.keys(body.players);
+
+  const usersWithActiveGame = await repositories.users.findAll({
+    filter: {
+      _id: {$in: userIds.map(o => ObjectId.createFromHexString(o))},
+      // @ts-ignore
+      currentGameId: {$ne: null},
+    }
+  });
+
+  if (usersWithActiveGame.length > 0) {
+    throw new ApiError("Some users are already in game", 400);
+  }
+
   const payload: LiveGame = {
-    players: Object.keys(body.players),
+    players: userIds,
     joinedAt: joinedAt,
     createdAt: Date.now(),
     currentPlayer: body.currentPlayer,
@@ -54,7 +68,7 @@ export async function performGameAction(user: FullDocument<User>, body: GameActi
 
   const userData = await repositories.users.findOne({ filter: { _id: user._id } });
   if (!userData) {
-    throw new ApiError("User not found", 404);
+    throw new ApiError("User not found", 401);
   }
 
   if (!userData.currentGameId) {
@@ -64,14 +78,17 @@ export async function performGameAction(user: FullDocument<User>, body: GameActi
   const gameRef = firebaseDatabase.ref(`live_games/${userData.currentGameId}`);
   const snapshot = await gameRef.once("value");
   const liveGame = snapshot.val();
+  const dbGame = await repositories.live_games.findOne({ filter: {_id: userData.currentGameId }});
 
-  if (!liveGame) {
+  if (!liveGame || !dbGame) {
     throw new ApiError("Game not found", 404);
   }
 
   if (liveGame.currentPlayer !== user._id.toString()) {
     throw new ApiError("It's not your turn", 400);
   }
+
+  const phase = liveGame.phase || "EDIT";
 
   if (!liveGame.cellData || !Array.isArray(liveGame.cellData)) {
     const BOARD_ROWS = 10;
@@ -84,7 +101,12 @@ export async function performGameAction(user: FullDocument<User>, body: GameActi
     await gameRef.child("cellData").set(liveGame.cellData);
   }
 
-  if (body.character != null) {
+  if (phase === "EDIT") {
+    // Must provide character + row + col
+    if (body.character == null || body.row == null || body.col == null) {
+      throw new ApiError("You must provide row, col, and character in EDIT phase", 400);
+    }
+
     const { row, col, character } = body;
 
     if (
@@ -98,16 +120,44 @@ export async function performGameAction(user: FullDocument<User>, body: GameActi
       throw new ApiError("Invalid cell coordinates", 400);
     }
 
-    // validate character if you have rules
     if (typeof character !== "string" || character.length !== 1) {
       throw new ApiError("Invalid character", 400);
     }
 
-    // apply action
+    // Apply edit
     liveGame.cellData[row][col] = character;
     await gameRef.child(`cellData/${row}/${col}`).set(character);
+    await repositories.live_games.updateOne({
+      _id: userData.currentGameId,
+    }, {
+      cellData: liveGame.cellData,
+    });
+  } else if (phase === "SELECTION") {
+    // Must provide claimedWords only
+    if (!body.claimedWords || !Array.isArray(body.claimedWords) || body.claimedWords.length === 0) {
+      throw new ApiError("You must provide claimedWords in SELECTION phase", 400);
+    }
+
+    // Example validation
+    for (const word of body.claimedWords) {
+      if (!word.word || !Array.isArray(word.cellCoordinates)) {
+        throw new ApiError("Invalid claimed word format", 400);
+      }
+    }
+
+    const existingClaimed = dbGame.claimedWords || {};
+    existingClaimed[user._id?.toString()] = [...existingClaimed[user._id?.toString()] || [], ...body.claimedWords.map(o => o.word)];
+
+    await repositories.live_games.updateOne({
+      _id: userData.currentGameId,
+    }, {
+      claimedWords: existingClaimed,
+    });
+  } else {
+    throw new ApiError(`Unsupported game phase: ${phase}`, 400);
   }
 
+  // After processing, trigger next turn
   triggerAdvanceTurn(userData.currentGameId.toString());
 
   return { success: true };
@@ -118,7 +168,7 @@ export async function getCurrentGameInfo(user: FullDocument<User>) {
   const userData = await repositories.users.findOne({filter: {_id: user._id}});
 
   if (!userData) {
-    throw new ApiError("User not found", 404);
+    throw new ApiError("User not found", 401);
   }
 
   let currentGameId = userData?.currentGameId ?? null;
@@ -202,16 +252,17 @@ export async function quitGame(user: FullDocument<User>) {
   return true;
 }
 
-
 export async function endGame(gameId: string) {
-  const liveGame = await repositories.live_games.findOne({filter: {_id: ObjectId.createFromHexString(gameId)}});
+  const liveGame = await repositories.live_games.findOne({
+    filter: { _id: ObjectId.createFromHexString(gameId) },
+  });
 
   if (!liveGame) {
     throw new ApiError("Live game not found", 404);
   }
 
   const gameRef = firebaseDatabase.ref(`live_games/${gameId}`);
-  const firebaseSnapshot = await gameRef.once('value');
+  const firebaseSnapshot = await gameRef.once("value");
   const liveFirebaseData = firebaseSnapshot.val();
   if (!liveFirebaseData) {
     throw new ApiError("Live game data not found in Firebase", 404);
@@ -221,7 +272,7 @@ export async function endGame(gameId: string) {
 
   try {
     const leftAt: Record<string, number> = {};
-    liveGame.players.forEach(playerId => {
+    liveGame.players.forEach((playerId) => {
       leftAt[playerId] = Date.now();
     });
 
@@ -237,21 +288,28 @@ export async function endGame(gameId: string) {
       claimedWords: liveGame.claimedWords || {},
     };
 
-    await repositories.game_history.create(gameHistoryPayload, {session});
-
-    await repositories.users.updateRaw(
-      {_id: {$in: liveGame.players.map(p => ObjectId.createFromHexString(p))}},
-      {$unset: {currentGameId: true}},
-      {session}
+    await repositories.game_history.updateOne(
+      { filter: { _id: liveGame._id } },
+      gameHistoryPayload,
+      { upsert: true, session }
     );
 
-    await repositories.live_games.deleteOne({filter: {_id: ObjectId.createFromHexString(gameId)}}, {session});
+    await repositories.users.updateRaw(
+      { _id: { $in: liveGame.players.map((p) => ObjectId.createFromHexString(p)) } },
+      { $unset: { currentGameId: true } },
+      { session }
+    );
+
+    await repositories.live_games.deleteOne(
+      { filter: { _id: ObjectId.createFromHexString(gameId) } },
+      { session }
+    );
 
     await gameRef.remove();
 
     await session.commitTransaction();
 
-    return {success: true};
+    return { success: true };
   } catch (error) {
     await session.abortTransaction();
     throw error;

@@ -18,7 +18,7 @@ import kotlinx.coroutines.tasks.await
 
 @Composable
 fun QueueScreen(navController: NavController, matchSize: Int) {
-    val token by LocalStorage.getToken(navController.context).collectAsState(initial = null)
+    val token by LocalStorage.getToken().collectAsState(initial = null)
     val userId = remember(token) {
         if (token.isNullOrEmpty()) {
             null

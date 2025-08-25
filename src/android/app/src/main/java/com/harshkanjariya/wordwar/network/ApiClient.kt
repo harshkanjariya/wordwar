@@ -18,7 +18,7 @@ object ApiClient {
     private val authInterceptor = Interceptor { chain ->
         val requestBuilder = chain.request().newBuilder()
         val token = runBlocking {
-            LocalStorage.getToken(WordWarApp.context).first()
+            LocalStorage.getToken().first()
         }
         token?.let {
             requestBuilder.header("Authorization", "Bearer $it")

@@ -83,6 +83,7 @@ export const onJoinQueue = onValueCreated(
         createdAt: Date.now(),
         cellData: cellData,
         currentPlayer: playersToMatch[0],
+        phase: "EDIT",
         selectedCell: "",
         turnTimestamp: Date.now(),
       };

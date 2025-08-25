@@ -66,13 +66,15 @@ data class Cell(
     val char: String
 )
 
+enum class GamePhase {
+    EDIT, SELECT
+}
+
 @Composable
 fun GameScreen(navController: NavController, matchId: String?) {
     val scope = rememberCoroutineScope()
     val gridSize = 10
-    val cells =
-        remember { mutableStateListOf<String>().apply { addAll(List(gridSize * gridSize) { "" }) } }
-    var currentMode by remember { mutableStateOf(GameMode.FILLING) }
+    val cells = remember { mutableStateListOf<String>().apply { addAll(List(gridSize * gridSize) { "" }) } }
     var isKeyboardVisible by remember { mutableStateOf(false) }
     var selectedCellIndexForInput by remember { mutableIntStateOf(-1) }
     val filledCell = remember { mutableStateOf<Cell?>(null) }
@@ -87,16 +89,13 @@ fun GameScreen(navController: NavController, matchId: String?) {
     val functions = FirebaseFunctions.getInstance("us-central1")
     val gameService = GameServiceHolder.api
 
-    val token by LocalStorage.getToken(navController.context).collectAsState(initial = null)
+    val token by LocalStorage.getToken().collectAsState(initial = null)
     val userId: String = remember(token) {
-        if (token.isNullOrEmpty()) {
-            ""
-        } else {
-            getUserIdFromJwt(token) ?: ""
-        }
+        if (token.isNullOrEmpty()) "" else getUserIdFromJwt(token) ?: ""
     }
 
     var currentPlayer by remember { mutableStateOf("") }
+    var phase by remember { mutableStateOf(GamePhase.EDIT) } // 🔥 new
     var turnTimestamp by remember { mutableLongStateOf(0L) }
     var remainingTime by remember { mutableIntStateOf(30) }
     var hasTriggeredTurnAdvance by remember { mutableStateOf(false) }
@@ -116,15 +115,12 @@ fun GameScreen(navController: NavController, matchId: String?) {
                 if (!isNavigatingToResults.value) {
                     if (!snapshot.exists()) {
                         onDisconnectRef.cancel()
-
                         isNavigatingToResults.value = true
                         scope.launch {
                             snackbarHostState.showSnackbar("Game has ended.")
                             delay(1000)
                             navController.navigate("game_results/$matchId") {
-                                popUpTo(navController.graph.id) {
-                                    inclusive = true
-                                }
+                                popUpTo(navController.graph.id) { inclusive = true }
                             }
                         }
                         return
@@ -132,18 +128,18 @@ fun GameScreen(navController: NavController, matchId: String?) {
 
                     val gameData = snapshot.value as? Map<String, Any>
                     val newCellData2D = gameData?.get("cellData") as? List<List<String>>
-
                     if (newCellData2D != null) {
                         val newCellData1D = newCellData2D.flatten()
-
                         cells.clear()
                         cells.addAll(newCellData1D)
                     }
 
-                    val newCurrentPlayer = gameData?.get("currentPlayer") as? String ?: ""
+                    currentPlayer = gameData?.get("currentPlayer") as? String ?: ""
                     val newTurnTimestamp = gameData?.get("turnTimestamp") as? Long ?: 0L
+                    val newPhase = (gameData?.get("phase") as? String ?: "edit").uppercase()
 
-                    currentPlayer = newCurrentPlayer
+                    phase = if (newPhase == "SELECT") GamePhase.SELECT else GamePhase.EDIT
+
                     if (newTurnTimestamp != turnTimestamp) {
                         turnTimestamp = newTurnTimestamp
                         hasTriggeredTurnAdvance = false
@@ -157,19 +153,17 @@ fun GameScreen(navController: NavController, matchId: String?) {
             }
         }
         gameRef.addValueEventListener(gameListener)
-        onDispose {
-            gameRef.removeEventListener(gameListener)
-        }
+        onDispose { gameRef.removeEventListener(gameListener) }
     }
+
+    // --- Timer ---
     LaunchedEffect(turnTimestamp) {
         val initialTimeLeft = 30 - ((System.currentTimeMillis() - turnTimestamp) / 1000).toInt()
         remainingTime = initialTimeLeft.coerceAtLeast(0)
 
-        if (remainingTime > 0) {
-            while (remainingTime > 0) {
-                delay(1000)
-                remainingTime--
-            }
+        while (remainingTime > 0) {
+            delay(1000)
+            remainingTime--
         }
 
         if (remainingTime <= 0 && !hasTriggeredTurnAdvance && userId == currentPlayer) {
@@ -177,10 +171,7 @@ fun GameScreen(navController: NavController, matchId: String?) {
             scope.launch {
                 try {
                     val data = hashMapOf("gameId" to matchId)
-                    functions
-                        .getHttpsCallable("advanceTurn")
-                        .call(data)
-                        .await()
+                    functions.getHttpsCallable("advanceTurn").call(data).await()
                 } catch (e: Exception) {
                     println("Failed to call advanceTurn: ${e.message}")
                 }
@@ -200,60 +191,57 @@ fun GameScreen(navController: NavController, matchId: String?) {
                 FloatingActionButton(
                     onClick = {
                         scope.launch {
-                            val character = filledCell.value?.char
-                            val row = filledCell.value?.index?.div(gridSize)
-                            val col = filledCell.value?.index?.rem(gridSize)
+                            if (phase == GamePhase.EDIT) {
+                                val character = filledCell.value?.char
+                                val row = filledCell.value?.index?.div(gridSize)
+                                val col = filledCell.value?.index?.rem(gridSize)
 
-                            val claimedWordPayloads = if (currentMode == GameMode.SELECTION) {
-                                if (selectedCells.isNotEmpty()) {
-                                    val word = buildString {
-                                        selectedCells.sorted()
-                                            .forEach { index -> append(cells[index]) }
-                                    }
-                                    if (word.isNotBlank() && isWordValid(word) && !claimedWords.contains(
-                                            word
-                                        )
-                                    ) {
-                                        val coordinates = selectedCells.map { index ->
-                                            CellCoordinatePayload(
-                                                row = index / gridSize,
-                                                col = index % gridSize
-                                            )
-                                        }
-                                        listOf(
-                                            ClaimedWordPayload(
-                                                word = word,
-                                                cellCoordinates = coordinates
-                                            )
-                                        )
-                                    } else {
-                                        snackbarHostState.showSnackbar("Invalid or already claimed word.")
-                                        emptyList()
+                                if (character != null && row != null && col != null) {
+                                    val payload = GameActionPayload(
+                                        character = character,
+                                        row = row,
+                                        col = col,
+                                        claimedWords = emptyList()
+                                    )
+                                    try {
+                                        gameService.submitAction(payload)
+                                        isSubmitted = true
+                                    } catch (e: Exception) {
+                                        snackbarHostState.showSnackbar("Failed: ${e.message}")
                                     }
                                 } else {
-                                    snackbarHostState.showSnackbar("No cells selected.")
-                                    emptyList()
+                                    snackbarHostState.showSnackbar("Pick a cell and letter first.")
                                 }
-                            } else {
-                                emptyList()
-                            }
 
-                            if (character != null || claimedWordPayloads.isNotEmpty()) {
-                                val payload = GameActionPayload(
-                                    character = character,
-                                    row = row,
-                                    col = col,
-                                    claimedWords = claimedWordPayloads
-                                )
+                            } else if (phase == GamePhase.SELECT) {
+                                if (selectedCells.isNotEmpty()) {
+                                    val word = buildString {
+                                        selectedCells.sorted().forEach { index -> append(cells[index]) }
+                                    }
+                                    if (word.isNotBlank() && isWordValid(word) && !claimedWords.contains(word)) {
+                                        val coordinates = selectedCells.map { index ->
+                                            CellCoordinatePayload(row = index / gridSize, col = index % gridSize)
+                                        }
+                                        val claimedWordPayload = ClaimedWordPayload(word, coordinates)
 
-                                try {
-                                    gameService.submitAction(payload)
-                                    isSubmitted = true
-                                } catch (e: Exception) {
-                                    snackbarHostState.showSnackbar("Failed to submit action: ${e.message}")
+                                        val payload = GameActionPayload(
+                                            character = null,
+                                            row = null,
+                                            col = null,
+                                            claimedWords = listOf(claimedWordPayload)
+                                        )
+                                        try {
+                                            gameService.submitAction(payload)
+                                            isSubmitted = true
+                                        } catch (e: Exception) {
+                                            snackbarHostState.showSnackbar("Failed: ${e.message}")
+                                        }
+                                    } else {
+                                        snackbarHostState.showSnackbar("Invalid or already claimed word.")
+                                    }
+                                } else {
+                                    snackbarHostState.showSnackbar("Select cells to form a word.")
                                 }
-                            } else {
-                                snackbarHostState.showSnackbar("Please make a move or select a word to claim.")
                             }
                         }
                     }
@@ -264,40 +252,30 @@ fun GameScreen(navController: NavController, matchId: String?) {
         }
     ) { innerPadding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp),
+            modifier = Modifier.fillMaxSize().padding(innerPadding).padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             GameHeader(
-                currentMode = currentMode,
-                onToggleMode = {
-                    currentMode =
-                        if (currentMode == GameMode.FILLING) GameMode.SELECTION else GameMode.FILLING
-                    selectedCells = emptySet()
-                    isKeyboardVisible = false
-                },
+                currentMode = if (phase == GamePhase.EDIT) GameMode.FILLING else GameMode.SELECTION,
+                onToggleMode = {}, // 🔒 No manual toggle anymore
                 onBackClick = { navController.popBackStack() }
             )
             Spacer(Modifier.height(12.dp))
 
-            Text(
-                text = if (userId == currentPlayer) "Your Turn!" else "Opponent's Turn",
-                fontSize = 20.sp
-            )
+            Text(text = if (userId == currentPlayer) "Your Turn!" else "Opponent's Turn", fontSize = 20.sp)
             Spacer(Modifier.height(8.dp))
+            Text(text = "Phase: ${phase.name}", fontSize = 18.sp)
             Text(text = "Time Left: $remainingTime s", fontSize = 24.sp)
             Spacer(Modifier.height(16.dp))
 
             WordGrid(
                 gridSize = gridSize,
                 cells = cells,
-                currentMode = currentMode,
+                currentMode = if (phase == GamePhase.EDIT) GameMode.FILLING else GameMode.SELECTION,
                 filledCell = filledCell.value,
-                highlightFilledCell = currentMode == GameMode.FILLING,
+                highlightFilledCell = (phase == GamePhase.EDIT),
                 onCellClick = { index ->
-                    if (currentPlayer == userId && currentMode == GameMode.FILLING && !isSubmitted) {
+                    if (phase == GamePhase.EDIT && currentPlayer == userId && !isSubmitted) {
                         if (cells[index].isBlank()) {
                             isKeyboardVisible = true
                             selectedCellIndexForInput = index
@@ -306,18 +284,18 @@ fun GameScreen(navController: NavController, matchId: String?) {
                         }
                     }
                 },
-                onCellsSelected = { newCells -> selectedCells = newCells },
+                onCellsSelected = { newCells ->
+                    if (phase == GamePhase.SELECT) selectedCells = newCells
+                },
                 selectedCells = selectedCells
             )
             Spacer(Modifier.height(16.dp))
 
             GameControls(
-                onClaimWord = { /* Logic handled by FAB now */ },
+                onClaimWord = { /* handled by FAB */ },
                 onEndGame = {
                     scope.launch {
-                        gameRef.child("players").child(userId).child("status").onDisconnect()
-                            .cancel()
-
+                        gameRef.child("players").child(userId).child("status").onDisconnect().cancel()
                         val result = GameServiceHolder.api.quitGame()
                         if (result.status == 200 && result.data != null) {
                             navController.popBackStack("menu", false)
@@ -332,34 +310,24 @@ fun GameScreen(navController: NavController, matchId: String?) {
 
     if (isKeyboardVisible) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .clickable(
-                    onClick = {
-                        isKeyboardVisible = false
-                        selectedCellIndexForInput = -1
-                    }
-                )
-                .background(Color.Black.copy(alpha = 0.5f)),
+            modifier = Modifier.fillMaxSize().clickable {
+                isKeyboardVisible = false
+                selectedCellIndexForInput = -1
+            }.background(Color.Black.copy(alpha = 0.5f)),
             contentAlignment = Alignment.BottomCenter
         ) {
             CustomKeyboard(
-                onBackspaceClicked = {
-                    filledCell.value = null
-                },
+                onBackspaceClicked = { filledCell.value = null },
                 onCharClicked = { char ->
                     scope.launch {
                         if (selectedCellIndexForInput != -1 && userId == currentPlayer) {
-                            filledCell.value = Cell(
-                                index = selectedCellIndexForInput,
-                                char = char
-                            )
+                            filledCell.value = Cell(index = selectedCellIndexForInput, char = char)
                         }
                         isKeyboardVisible = false
                         selectedCellIndexForInput = -1
                     }
                 },
-                modifier = Modifier.clickable(onClick = { /* consume click to prevent parent from closing */ })
+                modifier = Modifier.clickable { /* consume click */ }
             )
         }
     }

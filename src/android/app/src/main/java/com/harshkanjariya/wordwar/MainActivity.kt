@@ -35,7 +35,7 @@ class MainActivity : ComponentActivity() {
             WordWarTheme {
                 Surface(color = MaterialTheme.colorScheme.background) {
                     val navController = rememberNavController()
-                    val token by LocalStorage.getToken(this).collectAsState(initial = null)
+                    val token by LocalStorage.getToken().collectAsState(initial = null)
 
                     var startDestination by remember { mutableStateOf<String?>(null) }
 

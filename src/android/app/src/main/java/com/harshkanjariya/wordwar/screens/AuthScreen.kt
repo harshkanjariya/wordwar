@@ -18,8 +18,10 @@ import com.harshkanjariya.wordwar.data.LocalStorage
 import com.harshkanjariya.wordwar.network.service_holder.AuthServiceHolder
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.FirebaseAuth
+import com.harshkanjariya.wordwar.network.service.SocialLoginParam
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.launch
+import kotlin.math.acos
 
 @Composable
 fun AuthScreen(navController: NavController) {
@@ -71,14 +73,16 @@ fun AuthScreen(navController: NavController) {
                             if (firebaseIdToken != null) {
                                 // 3. Send the Firebase ID token to your backend
                                 val authResponse = AuthServiceHolder.api.socialLogin(
-                                    provider = "google",
-                                    token = firebaseIdToken
+                                    SocialLoginParam(
+                                        type = "google",
+                                        accessToken = firebaseIdToken
+                                    )
                                 )
 
                                 val tokenFromApi = authResponse.data?.token
 
                                 if (tokenFromApi != null && tokenFromApi.isNotEmpty()) {
-                                    LocalStorage.saveToken(context, tokenFromApi)
+                                    LocalStorage.saveToken(tokenFromApi)
 
                                     navController.navigate("menu") {
                                         popUpTo("auth") { inclusive = true }

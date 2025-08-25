@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.google.gson.Gson
 import com.google.gson.JsonObject
+import com.harshkanjariya.wordwar.WordWarApp
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -15,17 +16,17 @@ val Context.dataStore by preferencesDataStore(name = "user_prefs")
 object LocalStorage {
     private val TOKEN_KEY = stringPreferencesKey("auth_token")
 
-    suspend fun saveToken(context: Context, token: String) {
-        context.dataStore.edit { prefs ->
+    suspend fun saveToken(token: String) {
+        WordWarApp.context.dataStore.edit { prefs ->
             prefs[TOKEN_KEY] = token
         }
     }
 
-    fun getToken(context: Context): Flow<String?> = context.dataStore.data
+    fun getToken(): Flow<String?> = WordWarApp.context.dataStore.data
         .map { prefs -> prefs[TOKEN_KEY] }
 
-    suspend fun removeToken(context: Context) {
-        context.dataStore.edit {
+    suspend fun removeToken() {
+        WordWarApp.context.dataStore.edit {
             it.remove(TOKEN_KEY)
         }
     }

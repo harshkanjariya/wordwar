@@ -16,7 +16,7 @@ import com.harshkanjariya.wordwar.network.service_holder.GameServiceHolder
 @Composable
 fun MatchmakingOptionsScreen(navController: NavController) {
     val gameService = GameServiceHolder.api
-    val token by LocalStorage.getToken(navController.context).collectAsState(initial = null)
+    val token by LocalStorage.getToken().collectAsState(initial = null)
 
     var isLoading by remember { mutableStateOf(true) }
 

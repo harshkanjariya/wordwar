@@ -59,7 +59,7 @@ export class BaseRepository<T extends Document> {
   async updateOne(
     filter: Filter<FullDocument<T>>,
     updates: Partial<FullDocument<T>>,
-    options?: { session?: ClientSession },
+    options?: { session?: ClientSession, upsert?: boolean },
   ): Promise<FullDocument<T> | null> {
     const now = new Date();
     return (await this.collection.findOneAndUpdate(

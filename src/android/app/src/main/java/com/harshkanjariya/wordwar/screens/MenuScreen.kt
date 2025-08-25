@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.harshkanjariya.wordwar.data.LocalStorage
 import com.harshkanjariya.wordwar.network.service_holder.UserServiceHolder
 import kotlinx.coroutines.launch
 
@@ -31,7 +32,11 @@ fun MenuScreen(navController: NavController) {
             try {
                 val response = UserServiceHolder.api.getUserProfile()
                 userName = if (response.status == 200 && response.data != null) {
-                    response.data.name
+                    response.data.name ?: ""
+                } else if (response.status == 404) {
+                    LocalStorage.removeToken()
+                    navController.navigate("auth")
+                    ""
                 } else {
                     "Error"
                 }

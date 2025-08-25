@@ -3,17 +3,15 @@ package com.harshkanjariya.wordwar.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.harshkanjariya.wordwar.data.LocalStorage
 import com.harshkanjariya.wordwar.data.UserProfile
 import com.harshkanjariya.wordwar.network.service_holder.UserServiceHolder
 import kotlinx.coroutines.launch
@@ -51,6 +49,27 @@ fun ProfileScreen(navController: NavController) {
                             contentDescription = "Back"
                         )
                     }
+                },
+                actions = {
+                    IconButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                try {
+                                    LocalStorage.removeToken()
+                                    navController.navigate("auth") {
+                                        popUpTo(0) { inclusive = true } // clear backstack
+                                    }
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
+                            }
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ExitToApp,
+                            contentDescription = "Logout"
+                        )
+                    }
                 }
             )
         }
@@ -69,7 +88,6 @@ fun ProfileScreen(navController: NavController) {
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(32.dp))
-            // Placeholder for user details
             Text(
                 text = "Name: " + (user.value?.name ?: "Loading..."),
                 style = MaterialTheme.typography.bodyLarge
