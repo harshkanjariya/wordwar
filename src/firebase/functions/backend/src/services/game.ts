@@ -108,6 +108,23 @@ export async function getCurrentGameInfo(user: FullDocument<User>) {
   }
 }
 
+
+export async function getGameInfo(user: FullDocument<User>, gameId: string) {
+  const userData = await repositories.users.findOne({filter: {_id: user._id}});
+
+  const gameHistory = await repositories.game_history.findOne({filter: {_id: ObjectId.createFromHexString(gameId)}});
+
+  if (!gameHistory) {
+    throw new ApiError("Game not found", 404);
+  }
+
+  if (!gameHistory.players.includes(userData?._id?.toString() || "")) {
+    throw new ApiError("User not in this game", 400);
+  }
+
+  return gameHistory;
+}
+
 export async function quitGame(user: FullDocument<User>) {
   const userData = await repositories.users.findOne({filter: {_id: user._id}});
   if (!userData?.currentGameId) {
@@ -144,7 +161,6 @@ export async function endGame(gameId: string) {
     throw new ApiError("Live game data not found in Firebase", 404);
   }
 
-
   const session = await repositories.startTransaction();
 
   try {
@@ -154,6 +170,8 @@ export async function endGame(gameId: string) {
     });
 
     const gameHistoryPayload: GameHistory = {
+      // @ts-ignore
+      _id: liveGame._id,
       players: liveGame.players,
       joinedAt: liveGame.joinedAt,
       leftAt: leftAt,
@@ -177,8 +195,8 @@ export async function endGame(gameId: string) {
 
     await session.commitTransaction();
 
+    console.log("removed game");
     return {success: true};
-
   } catch (error) {
     await session.abortTransaction();
     throw error;

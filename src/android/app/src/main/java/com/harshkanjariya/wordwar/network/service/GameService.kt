@@ -5,6 +5,7 @@ import retrofit2.http.Body
 import retrofit2.http.POST
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.Path
 
 data class ActiveGameResponse(
     val currentGameId: String? = null,
@@ -28,6 +29,16 @@ data class GameActionPayload(
     val claimedWords: List<ClaimedWordPayload>? = null
 )
 
+data class GameInfo(
+    val players: List<String>,
+    val joinedAt: Map<String, String>,
+    val leftAt: Map<String, String>,
+    val startedAt: String,
+    val endedAt: String,
+    val cellData: List<List<String>>,
+    val claimedWords: Map<String, List<String>>
+)
+
 interface GameService {
     @POST("/api/game/submit_action")
     suspend fun submitAction(
@@ -39,4 +50,9 @@ interface GameService {
 
     @GET("/api/game/quit")
     suspend fun quitGame(): ApiResponse<Boolean>
+
+    @GET("/api/game/info/{gameId}")
+    suspend fun getGameInfo(
+        @Path("gameId") gameId: String
+    ): ApiResponse<GameInfo>
 }

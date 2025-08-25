@@ -75,9 +75,9 @@ fun AuthScreen(navController: NavController) {
                                     token = firebaseIdToken
                                 )
 
-                                val tokenFromApi = authResponse.data.token
+                                val tokenFromApi = authResponse.data?.token
 
-                                if (tokenFromApi.isNotEmpty()) {
+                                if (tokenFromApi != null && tokenFromApi.isNotEmpty()) {
                                     LocalStorage.saveToken(context, tokenFromApi)
 
                                     navController.navigate("menu") {

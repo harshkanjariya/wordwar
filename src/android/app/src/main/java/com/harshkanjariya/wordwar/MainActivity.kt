@@ -57,6 +57,10 @@ class MainActivity : ComponentActivity() {
                                 val matchId = backStackEntry.arguments?.getString("matchId")
                                 GameScreen(navController, matchId)
                             }
+                            composable("game_results/{matchId}", arguments = listOf(navArgument("matchId") { type = NavType.StringType })) { backStackEntry ->
+                                val matchId = backStackEntry.arguments?.getString("matchId")
+                                GameResultScreen(navController, matchId)
+                            }
                         }
                     }
                 }

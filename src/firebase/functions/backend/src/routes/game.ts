@@ -1,5 +1,5 @@
 import {Request, Response, Router} from "express";
-import {createLiveGame, endGame, getCurrentGameInfo, performGameAction, quitGame} from "../services/game";
+import {createLiveGame, endGame, getCurrentGameInfo, getGameInfo, performGameAction, quitGame} from "../services/game";
 import {validationAndPermissionMiddleware} from "../middlewares/validation-permission.middleware";
 import {GameAction} from "../dtos/game";
 
@@ -28,8 +28,9 @@ gameRoutes.post("/start_game",
 
 gameRoutes.post("/end_game",
   validateFirebaseCall,
-  async (req: Request) => {
-    return await endGame(req.body.gameId);
+  async (req: Request, res: Response) => {
+    const result = await endGame(req.body.gameId);
+    res.send(result);
   }
 )
 
@@ -49,9 +50,17 @@ gameRoutes.get("/active",
   }
 )
 
+gameRoutes.get("/info/:gameId",
+  async (req: Request, res: Response) => {
+    const result = await getGameInfo(req.user, req.params.gameId);
+    res.send(result);
+  }
+)
+
 gameRoutes.post("/quit",
-  async (req: Request) => {
-    return await quitGame(req.user);
+  async (req: Request, res: Response) => {
+    const result = await quitGame(req.user);
+    res.send(result);
   }
 )
 

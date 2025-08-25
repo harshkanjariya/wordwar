@@ -30,7 +30,7 @@ fun MenuScreen(navController: NavController) {
         coroutineScope.launch {
             try {
                 val response = UserServiceHolder.api.getUserProfile()
-                userName = if (response.status == 200) {
+                userName = if (response.status == 200 && response.data != null) {
                     response.data.name
                 } else {
                     "Error"

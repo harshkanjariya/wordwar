@@ -59,6 +59,7 @@ fun GameScreen(navController: NavController, matchId: String?) {
     var claimedWords by remember { mutableStateOf(listOf<String>()) }
     var selectedCells by remember { mutableStateOf(emptySet<Int>()) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val isNavigatingToResults = remember { mutableStateOf(false) }
 
     val database = FirebaseDatabase.getInstance()
     val gameRef = database.getReference("live_games").child(matchId ?: "")
@@ -91,32 +92,51 @@ fun GameScreen(navController: NavController, matchId: String?) {
 
         val gameListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                val gameData = snapshot.value as? Map<String, Any>
-                val players = gameData?.get("players") as? Map<String, Any>
-
-                val newCurrentPlayer = gameData?.get("currentPlayer") as? String ?: ""
-                val newTurnTimestamp = gameData?.get("turnTimestamp") as? Long ?: 0L
-
-                currentPlayer = newCurrentPlayer
-                if (newTurnTimestamp != turnTimestamp) {
-                    turnTimestamp = newTurnTimestamp
-                    hasTriggeredTurnAdvance = false
-                }
-
-                if (players != null) {
-                    val actions = players.flatMap { (playerId, playerInfo) ->
-                        val infoMap = playerInfo as? Map<String, Any>
-                        val actionsMap = infoMap?.get("actions") as? Map<String, Map<String, Any>>
-                        actionsMap?.mapNotNull { (actionId, actionInfo) ->
-                            val row = actionInfo["row"] as? Long
-                            val col = actionInfo["col"] as? Long
-                            val char = actionInfo["char"] as? String
-                            if (row != null && col != null && char != null) {
-                                (row.toInt() * gridSize) + col.toInt() to char
-                            } else null
-                        } ?: emptyList()
+                if (!isNavigatingToResults.value) {
+                    if (!snapshot.exists()) {
+                        // Game has been deleted
+                        isNavigatingToResults.value = true
+                        scope.launch {
+                            snackbarHostState.showSnackbar("Game has ended.")
+                            delay(1000) // Give time for snackbar to show
+                            // Use your game results screen route here
+                            navController.navigate("game_results/$matchId") {
+                                // Pop all back stack to prevent user from returning
+                                popUpTo(navController.graph.id) {
+                                    inclusive = true
+                                }
+                            }
+                        }
+                        return
                     }
-                    actions.forEach { (index, char) -> cells[index] = char }
+
+                    val gameData = snapshot.value as? Map<String, Any>
+                    val players = gameData?.get("players") as? Map<String, Any>
+
+                    val newCurrentPlayer = gameData?.get("currentPlayer") as? String ?: ""
+                    val newTurnTimestamp = gameData?.get("turnTimestamp") as? Long ?: 0L
+
+                    currentPlayer = newCurrentPlayer
+                    if (newTurnTimestamp != turnTimestamp) {
+                        turnTimestamp = newTurnTimestamp
+                        hasTriggeredTurnAdvance = false
+                    }
+
+                    if (players != null) {
+                        val actions = players.flatMap { (playerId, playerInfo) ->
+                            val infoMap = playerInfo as? Map<String, Any>
+                            val actionsMap = infoMap?.get("actions") as? Map<String, Map<String, Any>>
+                            actionsMap?.mapNotNull { (actionId, actionInfo) ->
+                                val row = actionInfo["row"] as? Long
+                                val col = actionInfo["col"] as? Long
+                                val char = actionInfo["char"] as? String
+                                if (row != null && col != null && char != null) {
+                                    (row.toInt() * gridSize) + col.toInt() to char
+                                } else null
+                            } ?: emptyList()
+                        }
+                        actions.forEach { (index, char) -> cells[index] = char }
+                    }
                 }
             }
 
@@ -268,7 +288,7 @@ fun GameScreen(navController: NavController, matchId: String?) {
                 onEndGame = {
                     scope.launch {
                         val result = GameServiceHolder.api.quitGame()
-                        if (result.status == 200 && result.data) {
+                        if (result.status == 200 && result.data != null) {
                             navController.popBackStack("menu", false)
                         }
                     }

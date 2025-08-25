@@ -25,7 +25,7 @@ fun MatchmakingOptionsScreen(navController: NavController) {
             try {
                 val response = gameService.getActiveGame()
                 if (response.status == 200) {
-                    if (response.data.currentGameId != null) {
+                    if (response.data != null) {
                         navController.navigate("game/${response.data.currentGameId}") {
                             popUpTo("matchmaking_options") { inclusive = true }
                         }
