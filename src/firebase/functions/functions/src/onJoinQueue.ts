@@ -3,10 +3,6 @@ import {onValueCreated} from "firebase-functions/v2/database";
 import {ApiResponse, Player} from "./types";
 import fetch from "node-fetch";
 
-// Initialize Firebase Admin SDK
-admin.initializeApp();
-
-// --- THE CORRECTED TRIGGER FUNCTION ---
 export const onJoinQueue = onValueCreated(
   {
     ref: "/matchmaking_queue/{queueSize}/{userId}",

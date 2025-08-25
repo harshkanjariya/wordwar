@@ -1,4 +1,14 @@
-import {ClientSession, Collection, Db, DeleteResult, Document, Filter, IndexSpecification, ObjectId} from "mongodb";
+import {
+  ClientSession,
+  Collection,
+  Db,
+  DeleteResult,
+  Document,
+  Filter,
+  IndexSpecification,
+  ObjectId,
+  UpdateFilter
+} from "mongodb";
 import {existingMongoCollections, getDB} from "./database";
 import {QueryOptions} from "../utils/mongo-types";
 import {google} from "firebase-functions/protos/compiledFirestore";
@@ -62,7 +72,23 @@ export class BaseRepository<T extends Document> {
     )) as any as FullDocument<T>;
   }
 
-  async findOne(options: QueryOptions<T>): Promise<FullDocument<T> | null> {
+  async updateRaw(
+    filter: Filter<FullDocument<T>>,
+    updates: UpdateFilter<T>,
+    options?: { session?: ClientSession },
+  ): Promise<FullDocument<T> | null> {
+    const now = new Date();
+    return (await this.collection.findOneAndUpdate(
+      filter as any,
+      updates,
+      {
+        returnDocument: "after",
+        ...options,
+      }
+    )) as any as FullDocument<T>;
+  }
+
+  async findOne(options: QueryOptions<FullDocument<T>>): Promise<FullDocument<T> | null> {
     const {filter, project} = options;
     return await this.collection.findOne((filter || {}) as any, {
       projection: project,
@@ -101,8 +127,8 @@ export class BaseRepository<T extends Document> {
   }
 
   // Delete a document by ID
-  async deleteOne(filter: Filter<T>): Promise<DeleteResult> {
-    return await this.collection.deleteOne(filter);
+  async deleteOne(filter: Filter<T>, options?: { session?: ClientSession }): Promise<DeleteResult> {
+    return await this.collection.deleteOne(filter, options);
   }
 
   // Delete multiple documents

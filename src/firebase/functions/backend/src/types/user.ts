@@ -21,6 +21,7 @@ export interface User {
   verifiedPhones: string[];
   tags?: string[];
   status: UserStatusEnum;
+  currentGameId?: ObjectId;
 }
 
 export enum UserStatusEnum {

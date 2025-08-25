@@ -166,26 +166,3 @@ fun WordGrid(
         }
     }
 }
-
-@Composable
-fun FillCellDialog(
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
-    characterInput: String,
-    onCharacterInputChange: (String) -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Fill Cell") },
-        text = {
-            TextField(
-                value = characterInput,
-                onValueChange = onCharacterInputChange,
-                label = { Text("Enter a character") },
-                singleLine = true
-            )
-        },
-        confirmButton = { Button(onClick = onConfirm) { Text("OK") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
-    )
-}

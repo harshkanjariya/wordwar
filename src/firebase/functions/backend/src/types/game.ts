@@ -4,6 +4,7 @@ export interface LiveGame {
   createdAt: number;
   cellData: string[][];
   currentPlayer: string;
+  claimedWords: Record<string, string[]>;
 }
 
 export interface GameHistory {
