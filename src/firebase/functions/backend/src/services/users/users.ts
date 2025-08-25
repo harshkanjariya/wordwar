@@ -105,7 +105,7 @@ export async function verifyOTP(data: VerifyOtpDto): Promise<boolean> {
     dataToUpdate.verifiedPhones = user.verifiedPhones?.concat(user.phoneNumber) || [user.phoneNumber];
   }
 
-  await repositories.users.update({_id: user._id}, dataToUpdate);
+  await repositories.users.updateOne({_id: user._id}, dataToUpdate);
 
   await redisManager.delete(`users:${user?._id}`);
   await redisManager.delete(cacheKey);
@@ -241,7 +241,7 @@ export async function resetPassword(data: ResetPasswordDto) {
   const {email} = await verifyResetToken(data);
 
   const hashedPassword = await bcrypt.hash(data.password, 10);
-  const user = await repositories.users.update(
+  const user = await repositories.users.updateOne(
     {email},
     {password: hashedPassword} // Update the password
   );
@@ -312,7 +312,7 @@ export function createUser(user: AdminCreateUserDto) {
 export async function updateUserDetails(id: string, body: AdminUpdateUserDto) {
   await redisManager.delete(`users:${id}`);
   const {_id, ...updateInfo} = body as any;
-  return repositories.users.update(
+  return repositories.users.updateOne(
     {
       _id: ObjectId.createFromHexString(id),
     },
@@ -396,7 +396,7 @@ export async function updateProfile(body: UpdateProfileDto, user: FullDocument<U
     dataToUpdate.phoneVerified = oldUser?.verifiedPhones?.includes(body.phoneNumber);
   }
 
-  return await repositories.users.update({
+  return await repositories.users.updateOne({
     _id: user?._id,
   }, dataToUpdate);
 }

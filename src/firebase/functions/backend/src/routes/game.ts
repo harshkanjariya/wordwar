@@ -38,7 +38,7 @@ gameRoutes.post("/submit_action",
   validationAndPermissionMiddleware(GameAction),
   async (req: Request, res: Response) => {
     const user = req.user;
-    const result = await performGameAction(user, req.body);
+    const result = await performGameAction(user, req.dto);
     res.send(result);
   }
 );

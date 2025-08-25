@@ -3,6 +3,39 @@ import {onValueCreated} from "firebase-functions/v2/database";
 import {ApiResponse, Player} from "./types";
 import fetch from "node-fetch";
 
+// eslint-disable-next-line require-jsdoc
+async function createGameViaApi(payload: any): Promise<string> {
+  const apiURL = "https://word-war-4.web.app/api";
+  const apiKey = "5cdf2476-491a-4cc5-8ff2-ecd8767a7e23";
+
+  if (!apiURL || !apiKey) {
+    throw new Error("API_URL or API_KEY environment variables are not set.");
+  }
+
+  try {
+    const response = await fetch(`${apiURL}/game/start_game`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`API call failed with status: ${response.status}, message: ${errorText}`);
+      throw new Error(`API call failed: ${response.status}`);
+    }
+
+    const result = await response.json() as ApiResponse;
+    return result.data._id;
+  } catch (error) {
+    console.error("Failed to call secure API:", error);
+    throw error;
+  }
+}
+
 export const onJoinQueue = onValueCreated(
   {
     ref: "/matchmaking_queue/{queueSize}/{userId}",
@@ -18,87 +51,66 @@ export const onJoinQueue = onValueCreated(
       return;
     }
 
-    // Get the latest state of the queue directly
-    const snapshot = await parentRef.once("value");
-    const currentQueue = snapshot.val();
-
-    if (!currentQueue) {
-      console.warn("Queue is empty. Aborting function.");
-      return;
-    }
-
     const size = parseInt(queueSize as string, 10);
-    const ids = Object.keys(currentQueue);
 
-    if (ids.length >= size) {
-      // Pick first `size` players
-      const playersToMatch = ids.slice(0, size);
-
-      // Keep only remaining players in queue
-      const updated: Record<string, unknown> = {};
-      for (const id of ids.slice(size)) {
-        updated[id] = currentQueue[id];
-      }
-
-      console.log("Formed match", {playersToMatch, remaining: Object.keys(updated)});
-
-      const playersJson: Record<string, Player> = {};
-      for (const playerId of playersToMatch) {
-        playersJson[playerId] = {
-          status: "Online",
-          joinedAt: currentQueue[playerId]?.timestamp,
-        };
-      }
-
-      // Create the 10x10 array with empty strings
-      const cellData: string[][] = Array.from({length: 10}, () => Array(10).fill(""));
-
-      // --- START OF API CALL LOGIC ---
-      const apiURL = "https://word-war-4.web.app/api";
-      const apiKey = "5cdf2476-491a-4cc5-8ff2-ecd8767a7e23";
-
-      if (!apiURL || !apiKey) {
-        console.error("API_URL or API_KEY environment variables are not set.");
+    const transactionResult = await parentRef.transaction(async (currentQueueData) => {
+      if (!currentQueueData) {
+        console.warn("Queue is empty. Aborting transaction.");
         return;
       }
 
-      const payload = {
-        players: playersJson,
-        matchSize: size,
-        createdAt: Date.now(),
-        cellData: cellData,
-        currentPlayer: playersToMatch[0],
-        selectedCell: "",
-        turnTimestamp: Date.now(),
-      };
+      const ids = Object.keys(currentQueueData);
 
-      try {
-        const response = await fetch(`${apiURL}/game/start_game`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": apiKey,
-          },
-          body: JSON.stringify(payload),
-        });
+      if (ids.length >= size) {
+        console.log("Forming match inside transaction...", {currentQueueData});
+        const playersToMatch = ids.slice(0, size);
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`API call failed with status: ${response.status}, message: ${errorText}`);
+        const playersJson: Record<string, Player> = {};
+        for (const playerId of playersToMatch) {
+          playersJson[playerId] = {
+            status: "Online",
+            joinedAt: currentQueueData[playerId]?.timestamp,
+          };
+        }
+
+        const cellData: string[][] = Array.from({length: 10}, () => Array(10).fill(""));
+        const gamePayload = {
+          players: playersJson,
+          matchSize: size,
+          createdAt: Date.now(),
+          cellData: cellData,
+          currentPlayer: playersToMatch[0],
+          selectedCell: "",
+          turnTimestamp: Date.now(),
+        };
+
+        let liveGameId: string;
+        try {
+          liveGameId = await createGameViaApi(gamePayload);
+        } catch (error) {
+          console.error("Transaction failed: API call failed.");
           return;
         }
 
-        const result = await response.json() as ApiResponse;
-        const liveGameId = result.data._id;
+        const updatedQueue: Record<string, unknown> = {};
+        for (const id of ids.slice(size)) {
+          updatedQueue[id] = currentQueueData[id];
+        }
 
-        await db.ref(`live_games/${liveGameId}`).set(payload);
+        await db.ref(`live_games/${liveGameId}`).set(gamePayload);
 
-        await parentRef.set(updated);
-      } catch (error) {
-        console.error("Failed to call secure API:", error);
+        console.log("Transaction successful: Game created and queue updated.");
+        return updatedQueue;
+      } else {
+        console.log("Not enough players yet. Aborting transaction.");
+        return;
       }
+    });
+
+    if (transactionResult.committed) {
+      console.log("Matchmaking transaction completed successfully.");
     } else {
-      console.log("Not enough players yet. Waiting...");
+      console.log("Matchmaking transaction aborted or failed.");
     }
   }
 );

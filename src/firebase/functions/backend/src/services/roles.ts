@@ -49,7 +49,7 @@ export async function createRole(data: CreateRoleDto) {
 }
 
 export async function updateRole(id: string, data: UpdateRoleDto) {
-  const role = await repositories.roles.update({
+  const role = await repositories.roles.updateOne({
     _id: ObjectId.createFromHexString(id),
   }, data);
 

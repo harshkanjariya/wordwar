@@ -27,10 +27,10 @@ export async function createLiveGame(body: any) {
   try {
     const game = await repositories.live_games.create(payload, {session});
 
-    await repositories.users.update({
-      _id: {
-        $in: Object.keys(body.players).map(o => ObjectId.createFromHexString(o)),
-      },
+    const userIds = Object.keys(body.players).map(o => ObjectId.createFromHexString(o));
+
+    await repositories.users.updateMany({
+      _id: {$in: userIds},
     }, {
       currentGameId: game._id,
     }, {session});
@@ -61,7 +61,7 @@ export async function performGameAction(user: FullDocument<User>, body: GameActi
   const snapshot = await gameRef.once('value');
   const liveGame = snapshot.val();
 
-  if (liveGame.currentPlayer !== user._id) {
+  if (liveGame.currentPlayer !== user._id.toString()) {
     throw new ApiError("It's not your turn", 400);
   }
 

@@ -56,7 +56,7 @@ export class BaseRepository<T extends Document> {
     })) as any as FullDocument<T>[];
   }
 
-  async update(
+  async updateOne(
     filter: Filter<FullDocument<T>>,
     updates: Partial<FullDocument<T>>,
     options?: { session?: ClientSession },
@@ -67,6 +67,21 @@ export class BaseRepository<T extends Document> {
       {$set: {...updates, updatedAt: now}},
       {
         returnDocument: "after",
+        ...options,
+      }
+    )) as any as FullDocument<T>;
+  }
+
+  async updateMany(
+    filter: Filter<FullDocument<T>>,
+    updates: Partial<FullDocument<T>>,
+    options?: { session?: ClientSession },
+  ): Promise<FullDocument<T> | null> {
+    const now = new Date();
+    return (await this.collection.updateMany(
+      filter as any,
+      {$set: {...updates, updatedAt: now}},
+      {
         ...options,
       }
     )) as any as FullDocument<T>;

@@ -67,11 +67,11 @@ fun GameScreen(navController: NavController, matchId: String?) {
     val gameService = GameServiceHolder.api
 
     val token by LocalStorage.getToken(navController.context).collectAsState(initial = null)
-    val userId = remember(token) {
+    val userId: String = remember(token) {
         if (token.isNullOrEmpty()) {
-            null
+            ""
         } else {
-            getUserIdFromJwt(token)
+            getUserIdFromJwt(token) ?: ""
         }
     }
 
@@ -80,28 +80,27 @@ fun GameScreen(navController: NavController, matchId: String?) {
     var remainingTime by remember { mutableIntStateOf(30) }
     var hasTriggeredTurnAdvance by remember { mutableStateOf(false) }
 
-    // Live Firebase Listener
     DisposableEffect(matchId, userId) {
-        if (matchId.isNullOrBlank() || userId.isNullOrBlank()) {
+        if (matchId.isNullOrBlank() || userId.isBlank()) {
             onDispose { }
             return@DisposableEffect onDispose { }
         }
 
+        val onDisconnectRef = gameRef.child("players").child(userId).child("status").onDisconnect()
         gameRef.child("players").child(userId).child("status").setValue("Online")
-        gameRef.child("players").child(userId).child("status").onDisconnect().setValue("Offline")
+        onDisconnectRef.setValue("Offline")
 
         val gameListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (!isNavigatingToResults.value) {
                     if (!snapshot.exists()) {
-                        // Game has been deleted
+                        onDisconnectRef.cancel()
+
                         isNavigatingToResults.value = true
                         scope.launch {
                             snackbarHostState.showSnackbar("Game has ended.")
-                            delay(1000) // Give time for snackbar to show
-                            // Use your game results screen route here
+                            delay(1000)
                             navController.navigate("game_results/$matchId") {
-                                // Pop all back stack to prevent user from returning
                                 popUpTo(navController.graph.id) {
                                     inclusive = true
                                 }
@@ -145,9 +144,10 @@ fun GameScreen(navController: NavController, matchId: String?) {
             }
         }
         gameRef.addValueEventListener(gameListener)
-        onDispose { gameRef.removeEventListener(gameListener) }
+        onDispose {
+            gameRef.removeEventListener(gameListener)
+        }
     }
-
     LaunchedEffect(turnTimestamp) {
         val initialTimeLeft = 30 - ((System.currentTimeMillis() - turnTimestamp) / 1000).toInt()
         remainingTime = initialTimeLeft.coerceAtLeast(0)
@@ -267,15 +267,13 @@ fun GameScreen(navController: NavController, matchId: String?) {
                 filledCell = filledCell.value,
                 highlightFilledCell = currentMode == GameMode.FILLING,
                 onCellClick = { index ->
-                    if (currentMode == GameMode.FILLING) {
+                    if (currentPlayer == userId && currentMode == GameMode.FILLING) {
                         if (cells[index].isBlank()) {
                             isKeyboardVisible = true
                             selectedCellIndexForInput = index
                         } else if (index == filledCell.value?.index) {
                             filledCell.value = null
                         }
-                    } else {
-                        scope.launch { snackbarHostState.showSnackbar("It's not your turn.") }
                     }
                 },
                 onCellsSelected = { newCells -> selectedCells = newCells },
@@ -287,6 +285,8 @@ fun GameScreen(navController: NavController, matchId: String?) {
                 onClaimWord = { /* Logic handled by FAB now */ },
                 onEndGame = {
                     scope.launch {
+                        gameRef.child("players").child(userId).child("status").onDisconnect().cancel()
+
                         val result = GameServiceHolder.api.quitGame()
                         if (result.status == 200 && result.data != null) {
                             navController.popBackStack("menu", false)

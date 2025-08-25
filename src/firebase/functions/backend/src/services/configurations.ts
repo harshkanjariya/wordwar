@@ -28,7 +28,7 @@ export async function upsertConfiguration(data: CreateConfigurationDto) {
   const configurations = await getConfigurationValue();
 
   if (configurations[data.key]) {
-    await repositories.configurations.update({key: data.key}, {value: data.value});
+    await repositories.configurations.updateOne({key: data.key}, {value: data.value});
   } else {
     await repositories.configurations.create(data);
   }
@@ -49,7 +49,7 @@ export async function updateConfiguration(key: string, data: UpdateConfiguration
   }
 
   // Update configuration in MongoDB
-  await repositories.configurations.update({key}, data);
+  await repositories.configurations.updateOne({key}, data);
 
   // Update the configuration in Redis
   configurations[key] = data.value;
