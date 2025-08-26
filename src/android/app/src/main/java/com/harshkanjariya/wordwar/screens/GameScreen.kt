@@ -2,52 +2,31 @@ package com.harshkanjariya.wordwar.screens
 
 import android.util.Log
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.ThumbUp
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -67,6 +46,7 @@ import com.harshkanjariya.wordwar.network.service.CellCoordinatePayload
 import com.harshkanjariya.wordwar.network.service.ClaimedWordPayload
 import com.harshkanjariya.wordwar.network.service.GameActionPayload
 import com.harshkanjariya.wordwar.network.service.GameData
+import com.harshkanjariya.wordwar.network.service.PlayerDto
 import com.harshkanjariya.wordwar.network.service_holder.GameServiceHolder
 import com.harshkanjariya.wordwar.network.service_holder.isWordValid
 import kotlinx.coroutines.delay
@@ -87,6 +67,11 @@ fun phaseStringToEnum(phase: String?): GamePhase {
     return GamePhase.EDIT
 }
 
+// Gamified Message System Types
+enum class MessageType {
+    INFO, SUCCESS, WARNING, ERROR
+}
+
 @Composable
 fun GameScreen(navController: NavController, matchId: String?) {
     val scope = rememberCoroutineScope()
@@ -98,9 +83,14 @@ fun GameScreen(navController: NavController, matchId: String?) {
     val filledCell = remember { mutableStateOf<Cell?>(null) }
     var claimedWords by remember { mutableStateOf(listOf<String>()) }
     var selectedCells by remember { mutableStateOf(emptySet<Int>()) }
-    val snackbarHostState = remember { SnackbarHostState() }
     val isNavigatingToResults = remember { mutableStateOf(false) }
     var isSubmitted by remember { mutableStateOf(false) }
+
+    // Gamified Message System States
+    var showMessage by remember { mutableStateOf(false) }
+    var messageText by remember { mutableStateOf("") }
+    var messageType by remember { mutableStateOf(MessageType.INFO) }
+    var messageIcon by remember { mutableStateOf<ImageVector?>(null) }
 
     val database = FirebaseDatabase.getInstance()
     val gameRef = database.getReference("live_games").child(matchId ?: "")
@@ -120,6 +110,76 @@ fun GameScreen(navController: NavController, matchId: String?) {
 
     var activeGame by remember { mutableStateOf<GameData?>(null) }
     var showPlayerInfo by remember { mutableStateOf(false) }
+    
+    fun showGamifiedMessage(text: String, type: MessageType, icon: ImageVector? = null) {
+        messageText = text
+        messageType = type
+        messageIcon = icon
+        showMessage = true
+        
+        scope.launch {
+            val duration = when (type) {
+                MessageType.SUCCESS -> 4000L // Success messages stay longer
+                MessageType.ERROR -> 5000L   // Error messages stay longer
+                MessageType.WARNING -> 3500L // Warning messages
+                MessageType.INFO -> 3000L    // Info messages
+            }
+            delay(duration)
+            showMessage = false
+        }
+        
+        // Add haptic feedback for different message types
+        when (type) {
+            MessageType.SUCCESS -> {
+                // Could add haptic feedback here
+            }
+            MessageType.ERROR -> {
+                // Could add haptic feedback here
+            }
+            else -> {}
+        }
+    }
+
+    // Function to calculate points based on word length
+    fun calculateWordPoints(word: String): Int {
+        return word.length * 10 // 10 points per letter
+    }
+
+    // Function to calculate total points for a player
+    fun calculatePlayerTotalPoints(player: PlayerDto): Int {
+        return player.claimedWords.sumOf { calculateWordPoints(it) }
+    }
+
+    // Function to check for new word claims and show notifications
+    fun checkForNewWordClaims(oldGameData: GameData, newGameData: GameData) {
+        newGameData.players.forEach { newPlayer ->
+            val oldPlayer = oldGameData.players.find { it._id == newPlayer._id }
+            if (oldPlayer != null) {
+                val newWords = newPlayer.claimedWords.toSet()
+                val oldWords = oldPlayer.claimedWords.toSet()
+                val newlyClaimedWords = newWords - oldWords
+                
+                if (newlyClaimedWords.isNotEmpty()) {
+                    // Combine all new words into one message
+                    val totalPoints = newlyClaimedWords.sumOf { calculateWordPoints(it) }
+                    val wordsList = newlyClaimedWords.joinToString(", ")
+                    val wordCount = newlyClaimedWords.size
+                    
+                    val message = if (wordCount == 1) {
+                        "🎯 ${newPlayer.name} claimed '${newlyClaimedWords.first()}' (+$totalPoints points)!"
+                    } else {
+                        "🎯 ${newPlayer.name} claimed $wordCount words: $wordsList (+$totalPoints points total)!"
+                    }
+                    
+                    showGamifiedMessage(
+                        message,
+                        MessageType.SUCCESS,
+                        Icons.Default.ThumbUp
+                    )
+                }
+            }
+        }
+    }
 
     DisposableEffect(matchId, userId) {
         if (matchId.isNullOrBlank() || userId.isBlank()) {
@@ -138,7 +198,7 @@ fun GameScreen(navController: NavController, matchId: String?) {
                         onDisconnectRef.cancel()
                         isNavigatingToResults.value = true
                         scope.launch {
-                            snackbarHostState.showSnackbar("Game has ended.")
+                            showGamifiedMessage("Game has ended! 🏁", MessageType.INFO, Icons.Default.Info)
                             delay(1000)
                             navController.navigate("game_results/$matchId") {
                                 popUpTo(navController.graph.id) { inclusive = true }
@@ -175,7 +235,14 @@ fun GameScreen(navController: NavController, matchId: String?) {
                         scope.launch {
                             try {
                                 val response = gameService.getActiveGame()
-                                activeGame = response.data?.gameData
+                                val newGameData = response.data?.gameData
+                                
+                                // Check for new word claims
+                                if (newGameData != null && activeGame != null) {
+                                    checkForNewWordClaims(activeGame!!, newGameData)
+                                }
+
+                                activeGame = newGameData
                             } catch (e: Exception) {
                                 println("Error fetching active game: ${e.message}")
                             }
@@ -185,7 +252,7 @@ fun GameScreen(navController: NavController, matchId: String?) {
             }
 
             override fun onCancelled(error: DatabaseError) {
-                scope.launch { snackbarHostState.showSnackbar("Failed to load game data: ${error.message}") }
+                scope.launch { showGamifiedMessage("Failed to load game data: ${error.message}", MessageType.ERROR, Icons.Default.Warning) }
             }
         }
         gameRef.addValueEventListener(gameListener)
@@ -304,14 +371,32 @@ fun GameScreen(navController: NavController, matchId: String?) {
                                 )
                                 try {
                                     val response = gameService.submitAction(payload)
-                                    if (response.status != 200) {
-                                        snackbarHostState.showSnackbar(response.message ?: "Action failed")
+                                                                            if (response.status != 200) {
+                                            showGamifiedMessage(
+                                                response.message ?: "Action failed",
+                                                MessageType.ERROR,
+                                                Icons.Default.Warning
+                                            )
+                                    } else {
+                                        showGamifiedMessage(
+                                            "Letter placed successfully! 🎯",
+                                            MessageType.SUCCESS,
+                                            Icons.Default.CheckCircle
+                                        )
                                     }
                                 } catch (e: Exception) {
-                                    snackbarHostState.showSnackbar("Failed: ${e.message}")
+                                    showGamifiedMessage(
+                                        "Failed: ${e.message}",
+                                        MessageType.ERROR,
+                                        Icons.Default.Warning
+                                    )
                                 }
                             } else {
-                                snackbarHostState.showSnackbar("Pick a cell and letter first.")
+                                showGamifiedMessage(
+                                    "Pick a cell and letter first! 📝",
+                                    MessageType.WARNING,
+                                    Icons.Default.Edit
+                                )
                             }
 
                         } else if (phase == GamePhase.SELECT) {
@@ -341,18 +426,40 @@ fun GameScreen(navController: NavController, matchId: String?) {
                                         val response = gameService.submitAction(payload)
                                         if (response.status == 200) {
                                             isSubmitted = true
+                                            val points = calculateWordPoints(word)
+                                            showGamifiedMessage(
+                                                "🎯 You claimed '$word' (+$points points)!",
+                                                MessageType.SUCCESS,
+                                                Icons.Default.ThumbUp
+                                            )
                                         } else {
-                                            snackbarHostState.showSnackbar(response.message ?: "Action failed")
+                                            showGamifiedMessage(
+                                                response.message ?: "Action failed",
+                                                MessageType.ERROR,
+                                                Icons.Default.Warning
+                                            )
                                         }
                                     } catch (e: Exception) {
                                         Log.e("submitAction", e.toString())
-                                        snackbarHostState.showSnackbar("Failed: ${e.message}")
+                                        showGamifiedMessage(
+                                            "Failed: ${e.message}",
+                                            MessageType.ERROR,
+                                            Icons.Default.Warning
+                                        )
                                     }
                                 } else {
-                                    snackbarHostState.showSnackbar("Invalid or already claimed word.")
+                                    showGamifiedMessage(
+                                        "Invalid or already claimed word! ❌",
+                                        MessageType.ERROR,
+                                        Icons.Default.Warning
+                                    )
                                 }
                             } else {
-                                snackbarHostState.showSnackbar("Select cells to form a word.")
+                                showGamifiedMessage(
+                                    "Select cells to form a word! 🔤",
+                                    MessageType.WARNING,
+                                    Icons.Default.Info
+                                )
                             }
                         }
                     }
@@ -386,13 +493,31 @@ fun GameScreen(navController: NavController, matchId: String?) {
                                     try {
                                         val response = gameService.submitAction(payload)
                                         if (response.status != 200) {
-                                            snackbarHostState.showSnackbar(response.message ?: "Action failed")
+                                            showGamifiedMessage(
+                                                response.message ?: "Action failed",
+                                                MessageType.ERROR,
+                                                Icons.Default.Warning
+                                            )
+                                        } else {
+                                            showGamifiedMessage(
+                                                "Letter placed successfully! 🎯",
+                                                MessageType.SUCCESS,
+                                                Icons.Default.CheckCircle
+                                            )
                                         }
                                     } catch (e: Exception) {
-                                        snackbarHostState.showSnackbar("Failed: ${e.message}")
+                                        showGamifiedMessage(
+                                            "Failed: ${e.message}",
+                                            MessageType.ERROR,
+                                            Icons.Default.Warning
+                                        )
                                     }
                                 } else {
-                                    snackbarHostState.showSnackbar("Pick a cell and letter first.")
+                                    showGamifiedMessage(
+                                        "Pick a cell and letter first! 📝",
+                                        MessageType.WARNING,
+                                        Icons.Default.Edit
+                                    )
                                 }
 
                             } else if (phase == GamePhase.SELECT) {
@@ -424,18 +549,40 @@ fun GameScreen(navController: NavController, matchId: String?) {
                                             val response = gameService.submitAction(payload)
                                             if (response.status == 200) {
                                                 isSubmitted = true
+                                                val points = calculateWordPoints(word)
+                                                showGamifiedMessage(
+                                                    "🎯 You claimed '$word' (+$points points)!",
+                                                    MessageType.SUCCESS,
+                                                    Icons.Default.ThumbUp
+                                                )
                                             } else {
-                                                snackbarHostState.showSnackbar(response.message ?: "Action failed")
+                                                showGamifiedMessage(
+                                                    response.message ?: "Action failed",
+                                                    MessageType.ERROR,
+                                                    Icons.Default.Warning
+                                                )
                                             }
                                         } catch (e: Exception) {
                                             Log.e("submitAction", e.toString())
-                                            snackbarHostState.showSnackbar("Failed: ${e.message}")
+                                            showGamifiedMessage(
+                                                "Failed: ${e.message}",
+                                                MessageType.ERROR,
+                                                Icons.Default.Warning
+                                            )
                                         }
                                     } else {
-                                        snackbarHostState.showSnackbar("Invalid or already claimed word.")
+                                        showGamifiedMessage(
+                                            "Invalid or already claimed word! ❌",
+                                            MessageType.ERROR,
+                                            Icons.Default.Warning
+                                        )
                                     }
                                 } else {
-                                    snackbarHostState.showSnackbar("Select cells to form a word.")
+                                    showGamifiedMessage(
+                                        "Select cells to form a word! 🔤",
+                                        MessageType.WARNING,
+                                        Icons.Default.Info
+                                    )
                                 }
                             }
                         }
@@ -494,11 +641,21 @@ fun GameScreen(navController: NavController, matchId: String?) {
             )
         }
 
-        // Snackbar Host
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.BottomCenter)
-        )
+        // Gamified Message System
+        if (showMessage) {
+            GamifiedMessageCard(
+                message = messageText,
+                type = messageType,
+                icon = messageIcon,
+                duration = when (messageType) {
+                    MessageType.SUCCESS -> 4000L
+                    MessageType.ERROR -> 5000L
+                    MessageType.WARNING -> 3500L
+                    MessageType.INFO -> 3000L
+                },
+                onDismiss = { showMessage = false }
+            )
+        }
     }
 }
 
@@ -533,7 +690,7 @@ private fun TopGameStatusBar(
                 modifier = Modifier.size(48.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.ArrowBack,
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back",
                     modifier = Modifier.size(24.dp),
                     tint = MaterialTheme.colorScheme.primary
@@ -582,7 +739,7 @@ private fun TopGameStatusBar(
 
         // Timer Bar
         LinearProgressIndicator(
-            progress = remainingTime / 30f,
+            progress = { remainingTime / 30f },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp, vertical = 0.dp),
@@ -807,6 +964,144 @@ private fun PlayerInfoOverlay(
                         style = MaterialTheme.typography.bodyLarge.copy(
                             fontWeight = FontWeight.Medium
                         )
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GamifiedMessageCard(
+    message: String,
+    type: MessageType,
+    icon: ImageVector?,
+    duration: Long,
+    onDismiss: () -> Unit
+) {
+    var isVisible by remember { mutableStateOf(false) }
+    var showProgress by remember { mutableStateOf(false) }
+    var progressValue by remember { mutableStateOf(1f) }
+    
+    val scale by animateFloatAsState(
+        targetValue = if (isVisible) 1f else 0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        )
+    )
+
+    val offsetY by animateFloatAsState(
+        targetValue = if (isVisible) 0f else -100f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        )
+    )
+
+    LaunchedEffect(Unit) {
+        isVisible = true
+        delay(100)
+        showProgress = true
+        
+        // Animate progress bar from 1.0 to 0.0 over the duration
+        val startTime = System.currentTimeMillis()
+        while (System.currentTimeMillis() - startTime < duration) {
+            val elapsed = System.currentTimeMillis() - startTime
+            progressValue = 1f - (elapsed.toFloat() / duration.toFloat())
+            delay(16) // ~60 FPS
+        }
+        progressValue = 0f
+        onDismiss()
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        contentAlignment = Alignment.TopCenter
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .scale(scale)
+                .offset(y = offsetY.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .clickable { onDismiss() },
+            colors = CardDefaults.cardColors(
+                containerColor = when (type) {
+                    MessageType.SUCCESS -> Color(0xFF4CAF50).copy(alpha = 0.95f)
+                    MessageType.WARNING -> Color(0xFFFF9800).copy(alpha = 0.95f)
+                    MessageType.ERROR -> Color(0xFFF44336).copy(alpha = 0.95f)
+                    MessageType.INFO -> Color(0xFF2196F3).copy(alpha = 0.95f)
+                }
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 16.dp),
+            shape = RoundedCornerShape(20.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Animated Icon with bounce effect
+                    if (icon != null) {
+                        var iconScale by remember { mutableStateOf(0f) }
+                        LaunchedEffect(Unit) {
+                            delay(200)
+                            iconScale = 1f
+                        }
+                        
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = message,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .scale(iconScale),
+                            tint = Color.White
+                        )
+                    }
+
+                    // Message Text
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold
+                        ),
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    // Close Button
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                                            Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close",
+                        tint = Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                    }
+                }
+                
+                // Progress Bar for auto-dismiss
+                if (showProgress) {
+                    Spacer(Modifier.height(12.dp))
+                    LinearProgressIndicator(
+                        progress = { progressValue },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp)),
+                        color = Color.White.copy(alpha = 0.8f),
+                        trackColor = Color.White.copy(alpha = 0.3f)
                     )
                 }
             }

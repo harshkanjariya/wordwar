@@ -139,16 +139,6 @@ fun MenuScreen(navController: NavController) {
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
-                MenuButton(
-                    text = "Settings",
-                    icon = Icons.Default.Settings,
-                    onClick = { /* TODO: Navigate to settings */ },
-                    isPrimary = false
-                )
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                // Quit Button
                 OutlinedButton(
                     onClick = {
                         (navController.context as Activity).finish()

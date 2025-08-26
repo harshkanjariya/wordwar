@@ -19,6 +19,7 @@ import androidx.navigation.navArgument
 import com.google.firebase.FirebaseApp
 import com.harshkanjariya.wordwar.data.LocalStorage
 import com.harshkanjariya.wordwar.screens.AuthScreen
+import com.harshkanjariya.wordwar.screens.GameResultScreen
 import com.harshkanjariya.wordwar.screens.GameScreen
 import com.harshkanjariya.wordwar.screens.HowToPlayScreen
 import com.harshkanjariya.wordwar.screens.MatchmakingOptionsScreen

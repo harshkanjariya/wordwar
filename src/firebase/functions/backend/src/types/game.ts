@@ -15,4 +15,5 @@ export interface GameHistory {
   endedAt: number;
   cellData: string[][];
   claimedWords: Record<string, string[]>;
+  playerNames?: Record<string, string>;
 }

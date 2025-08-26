@@ -49,7 +49,8 @@ data class GameInfo(
     val startedAt: String,
     val endedAt: String,
     val cellData: List<List<String>>,
-    val claimedWords: Map<String, List<String>>
+    val claimedWords: Map<String, List<String>>,
+    val playerNames: Map<String, String>? = null
 )
 
 interface GameService {

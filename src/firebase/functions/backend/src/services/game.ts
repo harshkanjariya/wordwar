@@ -281,7 +281,19 @@ export async function getGameInfo(user: FullDocument<User>, gameId: string) {
     throw new ApiError("User not in this game", 400);
   }
 
-  return gameHistory;
+  const players = await repositories.users.findAll({
+    filter: { _id: { $in: gameHistory.players.map((p) => ObjectId.createFromHexString(p)) } },
+  });
+
+  const playerNames: Record<string, string> = {};
+  players.forEach((player: any) => {
+    playerNames[player._id.toString()] = player.name || "Unknown";
+  });
+
+  return {
+    ...gameHistory,
+    playerNames: playerNames
+  };
 }
 
 export async function quitGame(user: FullDocument<User>) {
