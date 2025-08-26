@@ -1,182 +1,152 @@
 package com.harshkanjariya.wordwar.screens
 
-import PlayerInfoBottomSheet
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ThumbUp
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.google.firebase.database.*
-import com.google.firebase.functions.FirebaseFunctions
 import com.harshkanjariya.wordwar.components.*
-import com.harshkanjariya.wordwar.data.LocalStorage
-import com.harshkanjariya.wordwar.data.getUserIdFromJwt
-import com.harshkanjariya.wordwar.network.service.CellCoordinatePayload
-import com.harshkanjariya.wordwar.network.service.ClaimedWordPayload
-import com.harshkanjariya.wordwar.network.service.GameActionPayload
 import com.harshkanjariya.wordwar.network.service.GameData
-import com.harshkanjariya.wordwar.network.service_holder.GameServiceHolder
-import com.harshkanjariya.wordwar.network.service_holder.isWordValid
+import com.harshkanjariya.wordwar.network.service.PlayerDto
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 
-data class Cell(
-    val index: Int,
-    val char: String
+// Dummy data for How to Play screen
+private val dummyGameData = GameData(
+    createdAt = "2024-01-01T00:00:00Z",
+    updatedAt = "2024-01-01T00:00:00Z",
+    players = listOf(
+        PlayerDto(
+            _id = "player1",
+            name = "Demo Player",
+            joinedAt = "2024-01-01T00:00:00Z",
+            claimedWords = listOf("HELLO", "WORLD", "GAME")
+        ),
+        PlayerDto(
+            _id = "player2",
+            name = "Demo Opponent",
+            joinedAt = "2024-01-01T00:00:00Z",
+            claimedWords = listOf("PLAY", "FUN")
+        )
+    ),
+    cellData = List(10) { row ->
+        List(10) { col ->
+            when {
+                row == 4 && col in 0..4 -> "HELLO"[col].toString()
+                row == 5 && col in 0..3 -> "WORLD"[col].toString()
+                row == 6 && col in 0..3 -> "PLAY"[col].toString()
+                row == 7 && col in 0..2 -> "FUN"[col].toString()
+                else -> ""
+            }
+        }
+    }
 )
 
-enum class GamePhase {
-    EDIT, SELECT
-}
-
-fun phaseStringToEnum(phase: String?): GamePhase {
-    if (phase != null && phase.uppercase() == "SELECT") return GamePhase.SELECT
-    return GamePhase.EDIT
-}
-
 @Composable
-fun GameScreen(navController: NavController, matchId: String?) {
+fun HowToPlayScreen(navController: NavController) {
     val scope = rememberCoroutineScope()
     val gridSize = 10
-    val cells = remember { mutableStateListOf<String>().apply { addAll(List(gridSize * gridSize) { "" }) } }
+
+    // Local state for demo interactions
+    val cells = remember {
+        mutableStateListOf<String>().apply {
+            addAll(dummyGameData.cellData.flatten())
+        }
+    }
     var isKeyboardVisible by remember { mutableStateOf(false) }
     var selectedCellIndexForInput by remember { mutableIntStateOf(-1) }
     val filledCell = remember { mutableStateOf<Cell?>(null) }
-    var claimedWords by remember { mutableStateOf(listOf<String>()) }
     var selectedCells by remember { mutableStateOf(emptySet<Int>()) }
     val snackbarHostState = remember { SnackbarHostState() }
-    val isNavigatingToResults = remember { mutableStateOf(false) }
     var isSubmitted by remember { mutableStateOf(false) }
 
-    val database = FirebaseDatabase.getInstance()
-    val gameRef = database.getReference("live_games").child(matchId ?: "")
-    val functions = FirebaseFunctions.getInstance("us-central1")
-    val gameService = GameServiceHolder.api
-
-    val token by LocalStorage.getToken().collectAsState(initial = null)
-    val userId: String = remember(token) {
-        if (token.isNullOrEmpty()) "" else getUserIdFromJwt(token) ?: ""
-    }
-
-    var currentPlayer by remember { mutableStateOf("") }
+    // Demo game state
+    var currentPlayer by remember { mutableStateOf("player1") }
     var phase by remember { mutableStateOf(GamePhase.EDIT) }
-    var turnTimestamp by remember { mutableLongStateOf(0L) }
     var remainingTime by remember { mutableIntStateOf(30) }
-    var hasTriggeredTurnAdvance by remember { mutableStateOf(false) }
-
-    var activeGame by remember { mutableStateOf<GameData?>(null) }
     var showPlayerInfo by remember { mutableStateOf(false) }
 
-    DisposableEffect(matchId, userId) {
-        if (matchId.isNullOrBlank() || userId.isBlank()) {
-            onDispose { }
-            return@DisposableEffect onDispose { }
-        }
+    // Tour guide state
+    var currentTourStep by remember { mutableStateOf(0) }
+    var showTourGuide by remember { mutableStateOf(true) }
 
-        val onDisconnectRef = gameRef.child("players").child(userId).child("status").onDisconnect()
-        gameRef.child("players").child(userId).child("status").setValue("Online")
-        onDisconnectRef.setValue("Offline")
+    val tourSteps = listOf(
+        TourStep(
+            title = "Welcome to Word War!",
+            description = "This is a word-building game where you compete with other players. Let me show you how to play!",
+            highlight = TourHighlight.NONE
+        ),
+        TourStep(
+            title = "Game Grid",
+            description = "This is your game board. You'll place letters and form words here. Notice some words are already placed as examples.",
+            highlight = TourHighlight.GRID
+        ),
+        TourStep(
+            title = "Game Phases",
+            description = "The game has two phases: EDIT (place letters) and SELECT (form words). Watch the timer and phase indicator at the top.",
+            highlight = TourHighlight.STATUS_BAR
+        ),
+        TourStep(
+            title = "Placing Letters",
+            description = "In EDIT phase, tap an empty cell and select a letter from the keyboard. Try it now!",
+            highlight = TourHighlight.GRID
+        ),
+        TourStep(
+            title = "Forming Words",
+            description = "In SELECT phase, tap cells in sequence to form words. The cells must be connected horizontally, vertically, or diagonally.",
+            highlight = TourHighlight.GRID
+        ),
+        TourStep(
+            title = "Submit Actions",
+            description = "Use the floating action button or the Submit button below to confirm your moves.",
+            highlight = TourHighlight.SUBMIT_BUTTON
+        ),
+        TourStep(
+            title = "Player Info",
+            description = "Tap the player icon to see game statistics and claimed words for all players.",
+            highlight = TourHighlight.PLAYER_INFO
+        ),
+        TourStep(
+            title = "Timer & Turns",
+            description = "Each player has 30 seconds per turn. Use your time wisely!",
+            highlight = TourHighlight.TIMER
+        ),
+        TourStep(
+            title = "Ready to Play!",
+            description = "You now know the basics! Try interacting with the demo to practice. When you're ready, start a real game!",
+            highlight = TourHighlight.NONE
+        )
+    )
 
-        val gameListener = object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                if (!isNavigatingToResults.value) {
-                    if (!snapshot.exists()) {
-                        onDisconnectRef.cancel()
-                        isNavigatingToResults.value = true
-                        scope.launch {
-                            snackbarHostState.showSnackbar("Game has ended.")
-                            delay(1000)
-                            navController.navigate("game_results/$matchId") {
-                                popUpTo(navController.graph.id) { inclusive = true }
-                            }
-                        }
-                        return
-                    }
-
-                    val gameData = snapshot.value as? Map<String, Any>
-                    val newCellData2D = gameData?.get("cellData") as? List<List<String>>
-                    if (newCellData2D != null) {
-                        val newCellData1D = newCellData2D.flatten()
-                        cells.clear()
-                        cells.addAll(newCellData1D)
-                    }
-
-                    currentPlayer = gameData?.get("currentPlayer") as? String ?: ""
-                    val newTurnTimestamp = gameData?.get("turnTimestamp") as? Long ?: 0L
-                    val newPhase = phaseStringToEnum(gameData?.get("phase") as? String)
-
-                    if (phase != newPhase) {
-                        phase = newPhase
-                    }
-
-                    selectedCellIndexForInput = -1
-                    filledCell.value = null
-                    selectedCells = emptySet()
-
-                    if (newTurnTimestamp != turnTimestamp) {
-                        turnTimestamp = newTurnTimestamp
-                        hasTriggeredTurnAdvance = false
-                        isSubmitted = false
-
-                        scope.launch {
-                            try {
-                                val response = gameService.getActiveGame()
-                                activeGame = response.data?.gameData
-                            } catch (e: Exception) {
-                                println("Error fetching active game: ${e.message}")
-                            }
-                        }
-                    }
-                }
-            }
-
-            override fun onCancelled(error: DatabaseError) {
-                scope.launch { snackbarHostState.showSnackbar("Failed to load game data: ${error.message}") }
-            }
-        }
-        gameRef.addValueEventListener(gameListener)
-        onDispose { gameRef.removeEventListener(gameListener) }
-    }
-
-    LaunchedEffect(turnTimestamp) {
-        val initialTimeLeft = 30 - ((System.currentTimeMillis() - turnTimestamp) / 1000).toInt()
-        remainingTime = initialTimeLeft.coerceAtLeast(0)
-
-        while (remainingTime > 0) {
+    // Demo timer effect
+    LaunchedEffect(Unit) {
+        while (true) {
             delay(1000)
-            remainingTime--
-        }
-
-        if (!hasTriggeredTurnAdvance && userId == currentPlayer) {
-            hasTriggeredTurnAdvance = true
-            scope.launch {
-                try {
-                    val data = hashMapOf("gameId" to matchId)
-                    functions.getHttpsCallable("advanceTurn").call(data).await()
-                } catch (e: Exception) {
-                    println("Failed to call advanceTurn: ${e.message}")
-                }
+            if (remainingTime > 0) {
+                remainingTime--
+            } else {
+                remainingTime = 30
+                // Switch phases for demo
+                phase = if (phase == GamePhase.EDIT) GamePhase.SELECT else GamePhase.EDIT
+                isSubmitted = false
+                selectedCells = emptySet()
+                filledCell.value = null
             }
         }
     }
@@ -184,6 +154,10 @@ fun GameScreen(navController: NavController, matchId: String?) {
     BackHandler(enabled = isKeyboardVisible) {
         isKeyboardVisible = false
         selectedCellIndexForInput = -1
+    }
+
+    BackHandler(enabled = showTourGuide) {
+        showTourGuide = false
     }
 
     Box(
@@ -199,7 +173,7 @@ fun GameScreen(navController: NavController, matchId: String?) {
         ) {
             // Top Game Status Bar
             TopGameStatusBar(
-                isCurrentPlayer = userId == currentPlayer,
+                isCurrentPlayer = true, // Always show as current player for demo
                 phase = phase,
                 remainingTime = remainingTime,
                 onBackClick = { navController.popBackStack() },
@@ -221,7 +195,7 @@ fun GameScreen(navController: NavController, matchId: String?) {
                     filledCell = filledCell.value,
                     highlightFilledCell = (phase == GamePhase.EDIT),
                     onCellClick = { index ->
-                        if (phase == GamePhase.EDIT && currentPlayer == userId && !isSubmitted) {
+                        if (phase == GamePhase.EDIT && !isSubmitted) {
                             if (cells[index].isBlank()) {
                                 isKeyboardVisible = true
                                 selectedCellIndexForInput = index
@@ -240,72 +214,28 @@ fun GameScreen(navController: NavController, matchId: String?) {
             // Bottom Game Controls
             BottomGameControls(
                 phase = phase,
-                isCurrentPlayer = userId == currentPlayer,
+                isCurrentPlayer = true,
                 isSubmitted = isSubmitted,
                 selectedCells = selectedCells,
                 filledCell = filledCell.value,
-                onEndGame = {
-                    scope.launch {
-                        gameRef.child("players").child(userId).child("status").onDisconnect().cancel()
-                        val result = GameServiceHolder.api.quitGame()
-                        if (result.status == 200 && result.data != null) {
-                            navController.navigate("menu") {
-                                popUpTo(navController.graph.id) { inclusive = true }
-                            }
-                        }
-                    }
-                },
+                onEndGame = { navController.popBackStack() },
                 onSubmit = {
-                    scope.launch {
-                        if (phase == GamePhase.EDIT) {
-                            val character = filledCell.value?.char
-                            val row = filledCell.value?.index?.div(gridSize)
-                            val col = filledCell.value?.index?.rem(gridSize)
-
-                            if (character != null && row != null && col != null) {
-                                val payload = GameActionPayload(
-                                    character = character,
-                                    row = row,
-                                    col = col,
-                                    claimedWords = emptyList()
-                                )
-                                try {
-                                    gameService.submitAction(payload)
-                                } catch (e: Exception) {
-                                    snackbarHostState.showSnackbar("Failed: ${e.message}")
-                                }
-                            } else {
-                                snackbarHostState.showSnackbar("Pick a cell and letter first.")
-                            }
-
-                        } else if (phase == GamePhase.SELECT) {
-                            if (selectedCells.isNotEmpty()) {
-                                val word = buildString {
-                                    selectedCells.sorted().forEach { index -> append(cells[index]) }
-                                }
-                                if (word.isNotBlank() && isWordValid(word) && !claimedWords.contains(word)) {
-                                    val coordinates = selectedCells.map { index ->
-                                        CellCoordinatePayload(row = index / gridSize, col = index % gridSize)
-                                    }
-                                    val claimedWordPayload = ClaimedWordPayload(word, coordinates)
-
-                                    val payload = GameActionPayload(
-                                        character = null,
-                                        row = null,
-                                        col = null,
-                                        claimedWords = listOf(claimedWordPayload)
-                                    )
-                                    try {
-                                        gameService.submitAction(payload)
-                                        isSubmitted = true
-                                    } catch (e: Exception) {
-                                        snackbarHostState.showSnackbar("Failed: ${e.message}")
-                                    }
-                                } else {
-                                    snackbarHostState.showSnackbar("Invalid or already claimed word.")
-                                }
-                            } else {
-                                snackbarHostState.showSnackbar("Select cells to form a word.")
+                    // Demo submit logic
+                    if (phase == GamePhase.EDIT && filledCell.value != null) {
+                        // Simulate successful submission
+                        isSubmitted = true
+                        scope.launch {
+                            snackbarHostState.showSnackbar("Demo: Letter placed successfully!")
+                        }
+                    } else if (phase == GamePhase.SELECT && selectedCells.isNotEmpty()) {
+                        // Simulate word submission
+                        val word = buildString {
+                            selectedCells.sorted().forEach { index -> append(cells[index]) }
+                        }
+                        if (word.isNotBlank()) {
+                            isSubmitted = true
+                            scope.launch {
+                                snackbarHostState.showSnackbar("Demo: Word '$word' submitted!")
                             }
                         }
                     }
@@ -314,65 +244,28 @@ fun GameScreen(navController: NavController, matchId: String?) {
         }
 
         // Floating Action Button for Submit
-        if (userId == currentPlayer && !isSubmitted) {
+        if (!isSubmitted) {
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(24.dp)
-                    .padding(bottom = 16.dp)
+                    .padding(start = 24.dp, top = 24.dp, end = 24.dp, bottom = 40.dp)
             ) {
                 FloatingActionButton(
                     onClick = {
-                        scope.launch {
-                            if (phase == GamePhase.EDIT) {
-                                val character = filledCell.value?.char
-                                val row = filledCell.value?.index?.div(gridSize)
-                                val col = filledCell.value?.index?.rem(gridSize)
-
-                                if (character != null && row != null && col != null) {
-                                    val payload = GameActionPayload(
-                                        character = character,
-                                        row = row,
-                                        col = col,
-                                        claimedWords = emptyList()
-                                    )
-                                    try {
-                                        gameService.submitAction(payload)
-                                    } catch (e: Exception) {
-                                        snackbarHostState.showSnackbar("Failed: ${e.message}")
-                                    }
-                                } else {
-                                    snackbarHostState.showSnackbar("Pick a cell and letter first.")
-                                }
-
-                            } else if (phase == GamePhase.SELECT) {
-                                if (selectedCells.isNotEmpty()) {
-                                    val word = buildString {
-                                        selectedCells.sorted().forEach { index -> append(cells[index]) }
-                                    }
-                                    if (word.isNotBlank() && isWordValid(word) && !claimedWords.contains(word)) {
-                                        val coordinates = selectedCells.map { index ->
-                                            CellCoordinatePayload(row = index / gridSize, col = index % gridSize)
-                                        }
-                                        val claimedWordPayload = ClaimedWordPayload(word, coordinates)
-
-                                        val payload = GameActionPayload(
-                                            character = null,
-                                            row = null,
-                                            col = null,
-                                            claimedWords = listOf(claimedWordPayload)
-                                        )
-                                        try {
-                                            gameService.submitAction(payload)
-                                            isSubmitted = true
-                                        } catch (e: Exception) {
-                                            snackbarHostState.showSnackbar("Failed: ${e.message}")
-                                        }
-                                    } else {
-                                        snackbarHostState.showSnackbar("Invalid or already claimed word.")
-                                    }
-                                } else {
-                                    snackbarHostState.showSnackbar("Select cells to form a word.")
+                        // Demo submit logic
+                        if (phase == GamePhase.EDIT && filledCell.value != null) {
+                            isSubmitted = true
+                            scope.launch {
+                                snackbarHostState.showSnackbar("Demo: Letter placed successfully!")
+                            }
+                        } else if (phase == GamePhase.SELECT && selectedCells.isNotEmpty()) {
+                            val word = buildString {
+                                selectedCells.sorted().forEach { index -> append(cells[index]) }
+                            }
+                            if (word.isNotBlank()) {
+                                isSubmitted = true
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("Demo: Word '$word' submitted!")
                                 }
                             }
                         }
@@ -400,19 +293,17 @@ fun GameScreen(navController: NavController, matchId: String?) {
                         MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
                         RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
                     )
-                    .clickable { 
+                    .clickable {
                         isKeyboardVisible = false
-                        selectedCellIndexForInput = -1 
+                        selectedCellIndexForInput = -1
                     },
                 contentAlignment = Alignment.BottomCenter
             ) {
                 CustomKeyboard(
                     onBackspaceClicked = { filledCell.value = null },
                     onCharClicked = { char ->
-                        scope.launch {
-                            if (selectedCellIndexForInput != -1 && userId == currentPlayer) {
-                                filledCell.value = Cell(index = selectedCellIndexForInput, char = char)
-                            }
+                        if (selectedCellIndexForInput != -1) {
+                            filledCell.value = Cell(index = selectedCellIndexForInput, char = char)
                             isKeyboardVisible = false
                             selectedCellIndexForInput = -1
                         }
@@ -422,11 +313,33 @@ fun GameScreen(navController: NavController, matchId: String?) {
             }
         }
 
-        // Player Info Overlay (replaces bottom sheet)
-        if (showPlayerInfo && activeGame != null) {
+        // Player Info Overlay
+        if (showPlayerInfo) {
             PlayerInfoOverlay(
-                activeGame = activeGame!!,
+                activeGame = dummyGameData,
                 onDismiss = { showPlayerInfo = false }
+            )
+        }
+
+        // Tour Guide Overlay
+        if (showTourGuide) {
+            TourGuideOverlay(
+                currentStep = tourSteps[currentTourStep],
+                totalSteps = tourSteps.size,
+                currentStepIndex = currentTourStep,
+                onNext = {
+                    if (currentTourStep < tourSteps.size - 1) {
+                        currentTourStep++
+                    } else {
+                        showTourGuide = false
+                    }
+                },
+                onPrevious = {
+                    if (currentTourStep > 0) {
+                        currentTourStep--
+                    }
+                },
+                onSkip = { showTourGuide = false }
             )
         }
 
@@ -438,6 +351,7 @@ fun GameScreen(navController: NavController, matchId: String?) {
     }
 }
 
+// Reuse all the same UI components from GameScreen
 @Composable
 private fun TopGameStatusBar(
     isCurrentPlayer: Boolean,
@@ -579,10 +493,12 @@ private fun BottomGameControls(
             // Game Instructions
             Text(
                 text = when {
-                    phase == GamePhase.EDIT && isCurrentPlayer && !isSubmitted -> 
+                    phase == GamePhase.EDIT && isCurrentPlayer && !isSubmitted ->
                         "Tap an empty cell and select a letter"
-                    phase == GamePhase.SELECT && isCurrentPlayer && !isSubmitted -> 
+
+                    phase == GamePhase.SELECT && isCurrentPlayer && !isSubmitted ->
                         "Select cells to form a word"
+
                     else -> "Waiting for opponent..."
                 },
                 style = MaterialTheme.typography.bodyLarge.copy(
@@ -609,7 +525,7 @@ private fun BottomGameControls(
                         color = MaterialTheme.colorScheme.error
                     )
                 ) {
-                    Text("End Game")
+                    Text("Back to Menu")
                 }
 
                 if (isCurrentPlayer && !isSubmitted) {
@@ -690,9 +606,9 @@ private fun PlayerInfoOverlay(
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                             )
-                            
+
                             Spacer(Modifier.height(8.dp))
-                            
+
                             Text(
                                 text = "Claimed Words:",
                                 style = MaterialTheme.typography.bodyMedium.copy(
@@ -700,9 +616,9 @@ private fun PlayerInfoOverlay(
                                     fontWeight = FontWeight.Medium
                                 )
                             )
-                            
+
                             Spacer(Modifier.height(4.dp))
-                            
+
                             if (player.claimedWords.isNotEmpty()) {
                                 player.claimedWords.forEach { word ->
                                     Text(
@@ -742,6 +658,130 @@ private fun PlayerInfoOverlay(
                             fontWeight = FontWeight.Medium
                         )
                     )
+                }
+            }
+        }
+    }
+}
+
+// Tour guide data classes
+data class TourStep(
+    val title: String,
+    val description: String,
+    val highlight: TourHighlight
+)
+
+enum class TourHighlight {
+    NONE, GRID, STATUS_BAR, SUBMIT_BUTTON, PLAYER_INFO, TIMER
+}
+
+@Composable
+private fun TourGuideOverlay(
+    currentStep: TourStep,
+    totalSteps: Int,
+    currentStepIndex: Int,
+    onNext: () -> Unit,
+    onPrevious: () -> Unit,
+    onSkip: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.7f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(32.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 16.dp),
+            shape = RoundedCornerShape(24.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = currentStep.title,
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    ),
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                Text(
+                    text = currentStep.description,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 24.sp
+                    )
+                )
+
+                Spacer(Modifier.height(24.dp))
+
+                // Progress indicator
+                LinearProgressIndicator(
+                    progress = (currentStepIndex + 1) / totalSteps.toFloat(),
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                Spacer(Modifier.height(8.dp))
+
+                Text(
+                    text = "Step ${currentStepIndex + 1} of $totalSteps",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                )
+
+                Spacer(Modifier.height(24.dp))
+
+                // Navigation buttons
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedButton(
+                        onClick = onSkip,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    ) {
+                        Text("Skip Tour")
+                    }
+
+                    if (currentStepIndex > 0) {
+                        OutlinedButton(
+                            onClick = onPrevious,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Text("Previous")
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+
+                    Button(
+                        onClick = onNext,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Text(if (currentStepIndex == totalSteps - 1) "Finish" else "Next")
+                    }
                 }
             }
         }

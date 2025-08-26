@@ -134,7 +134,7 @@ fun MenuScreen(navController: NavController) {
                 MenuButton(
                     text = "How to Play",
                     icon = Icons.Default.Info,
-                    onClick = { /* TODO: Navigate to help screen */ },
+                    onClick = { navController.navigate("how_to_play") },
                     isPrimary = false
                 )
                 Spacer(modifier = Modifier.height(16.dp))

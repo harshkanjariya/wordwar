@@ -61,7 +61,7 @@ interface GameService {
     @GET("game/active")
     suspend fun getActiveGame(): ApiResponse<ActiveGameResponse>
 
-    @GET("game/quit")
+    @POST("game/quit")
     suspend fun quitGame(): ApiResponse<Boolean>
 
     @GET("game/info/{gameId}")
