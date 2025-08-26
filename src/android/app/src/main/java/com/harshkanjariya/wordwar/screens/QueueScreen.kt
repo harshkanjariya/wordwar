@@ -62,6 +62,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.runtime.DisposableEffect
+import com.harshkanjariya.wordwar.assets.SoundManager
 
 
 @Composable
@@ -81,6 +82,7 @@ fun QueueScreen(navController: NavController, matchSize: Int) {
     // Load initial word and prepare next word
     LaunchedEffect(Unit) {
         try {
+            SoundManager.preload(navController.context)
             currentWord = WordService.getCurrentWord()
             WordService.loadNextWord() // Prepare next word
         } catch (e: Exception) {
@@ -158,6 +160,7 @@ fun QueueScreen(navController: NavController, matchSize: Int) {
                 if (gameSnapshot != null) {
                     foundMatchId = gameSnapshot.key
                     statusMessage = "Match found!"
+                    SoundManager.matchFound()
                 }
             }
 

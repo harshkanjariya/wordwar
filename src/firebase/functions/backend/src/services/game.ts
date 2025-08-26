@@ -7,6 +7,12 @@ import {GameHistory, LiveGame} from "../types/game";
 import {ApiError} from "../bootstrap/errors";
 import {firebaseDatabase} from "../utils/firebase";
 import {triggerAdvanceTurn} from "../external_apis/advance_turn";
+import {
+  buildWordFromCells,
+  validateCellsFilled,
+  validateEmptyCell,
+  validateLinearSelection, validateWord, validateWordNotClaimed
+} from "../utils/game_action_validation";
 
 export async function createLiveGame(body: any) {
   const session = await repositories.startTransaction();
@@ -109,6 +115,8 @@ export async function performGameAction(user: FullDocument<User>, body: GameActi
 
     const { row, col, character } = body;
 
+    validateEmptyCell(liveGame, row, col);
+
     if (
       typeof row !== "number" ||
       typeof col !== "number" ||
@@ -151,6 +159,24 @@ export async function performGameAction(user: FullDocument<User>, body: GameActi
       if (!word.word || !Array.isArray(word.cellCoordinates)) {
         throw new ApiError("Invalid claimed word format", 400);
       }
+      // 1. Check line validity
+      validateLinearSelection(word.cellCoordinates);
+
+      // 2. Ensure all cells are filled
+      validateCellsFilled(liveGame, word.cellCoordinates);
+
+      // 3. Build word from grid
+      const builtWord = buildWordFromCells(liveGame, word.cellCoordinates);
+
+      if (builtWord.toLowerCase() !== word.word.toLowerCase()) {
+        throw new ApiError("Claimed word does not match selected cells", 400);
+      }
+
+      // 4. Validate dictionary
+      await validateWord(word.word);
+
+      // 5. Ensure not already claimed
+      validateWordNotClaimed(word.word, dbGame);
     }
 
     const existingClaimed = dbGame.claimedWords || {};

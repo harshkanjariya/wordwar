@@ -1,34 +1,66 @@
 package com.harshkanjariya.wordwar.screens
 
-import PlayerInfoBottomSheet
+import android.util.Log
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ThumbUp
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.google.firebase.database.*
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 import com.google.firebase.functions.FirebaseFunctions
-import com.harshkanjariya.wordwar.components.*
+import com.harshkanjariya.wordwar.components.CustomKeyboard
+import com.harshkanjariya.wordwar.components.WordGrid
 import com.harshkanjariya.wordwar.data.LocalStorage
 import com.harshkanjariya.wordwar.data.getUserIdFromJwt
 import com.harshkanjariya.wordwar.network.service.CellCoordinatePayload
@@ -59,7 +91,8 @@ fun phaseStringToEnum(phase: String?): GamePhase {
 fun GameScreen(navController: NavController, matchId: String?) {
     val scope = rememberCoroutineScope()
     val gridSize = 10
-    val cells = remember { mutableStateListOf<String>().apply { addAll(List(gridSize * gridSize) { "" }) } }
+    val cells =
+        remember { mutableStateListOf<String>().apply { addAll(List(gridSize * gridSize) { "" }) } }
     var isKeyboardVisible by remember { mutableStateOf(false) }
     var selectedCellIndexForInput by remember { mutableIntStateOf(-1) }
     val filledCell = remember { mutableStateOf<Cell?>(null) }
@@ -237,7 +270,6 @@ fun GameScreen(navController: NavController, matchId: String?) {
                 )
             }
 
-            // Bottom Game Controls
             BottomGameControls(
                 phase = phase,
                 isCurrentPlayer = userId == currentPlayer,
@@ -246,7 +278,8 @@ fun GameScreen(navController: NavController, matchId: String?) {
                 filledCell = filledCell.value,
                 onEndGame = {
                     scope.launch {
-                        gameRef.child("players").child(userId).child("status").onDisconnect().cancel()
+                        gameRef.child("players").child(userId).child("status").onDisconnect()
+                            .cancel()
                         val result = GameServiceHolder.api.quitGame()
                         if (result.status == 200 && result.data != null) {
                             navController.navigate("menu") {
@@ -270,7 +303,10 @@ fun GameScreen(navController: NavController, matchId: String?) {
                                     claimedWords = emptyList()
                                 )
                                 try {
-                                    gameService.submitAction(payload)
+                                    val response = gameService.submitAction(payload)
+                                    if (response.status != 200) {
+                                        snackbarHostState.showSnackbar(response.message ?: "Action failed")
+                                    }
                                 } catch (e: Exception) {
                                     snackbarHostState.showSnackbar("Failed: ${e.message}")
                                 }
@@ -283,9 +319,15 @@ fun GameScreen(navController: NavController, matchId: String?) {
                                 val word = buildString {
                                     selectedCells.sorted().forEach { index -> append(cells[index]) }
                                 }
-                                if (word.isNotBlank() && isWordValid(word) && !claimedWords.contains(word)) {
+                                if (word.isNotBlank() && isWordValid(word) && !claimedWords.contains(
+                                        word
+                                    )
+                                ) {
                                     val coordinates = selectedCells.map { index ->
-                                        CellCoordinatePayload(row = index / gridSize, col = index % gridSize)
+                                        CellCoordinatePayload(
+                                            row = index / gridSize,
+                                            col = index % gridSize
+                                        )
                                     }
                                     val claimedWordPayload = ClaimedWordPayload(word, coordinates)
 
@@ -296,9 +338,14 @@ fun GameScreen(navController: NavController, matchId: String?) {
                                         claimedWords = listOf(claimedWordPayload)
                                     )
                                     try {
-                                        gameService.submitAction(payload)
-                                        isSubmitted = true
+                                        val response = gameService.submitAction(payload)
+                                        if (response.status == 200) {
+                                            isSubmitted = true
+                                        } else {
+                                            snackbarHostState.showSnackbar(response.message ?: "Action failed")
+                                        }
                                     } catch (e: Exception) {
+                                        Log.e("submitAction", e.toString())
                                         snackbarHostState.showSnackbar("Failed: ${e.message}")
                                     }
                                 } else {
@@ -337,7 +384,10 @@ fun GameScreen(navController: NavController, matchId: String?) {
                                         claimedWords = emptyList()
                                     )
                                     try {
-                                        gameService.submitAction(payload)
+                                        val response = gameService.submitAction(payload)
+                                        if (response.status != 200) {
+                                            snackbarHostState.showSnackbar(response.message ?: "Action failed")
+                                        }
                                     } catch (e: Exception) {
                                         snackbarHostState.showSnackbar("Failed: ${e.message}")
                                     }
@@ -348,13 +398,21 @@ fun GameScreen(navController: NavController, matchId: String?) {
                             } else if (phase == GamePhase.SELECT) {
                                 if (selectedCells.isNotEmpty()) {
                                     val word = buildString {
-                                        selectedCells.sorted().forEach { index -> append(cells[index]) }
+                                        selectedCells.sorted()
+                                            .forEach { index -> append(cells[index]) }
                                     }
-                                    if (word.isNotBlank() && isWordValid(word) && !claimedWords.contains(word)) {
+                                    if (word.isNotBlank() && isWordValid(word) && !claimedWords.contains(
+                                            word
+                                        )
+                                    ) {
                                         val coordinates = selectedCells.map { index ->
-                                            CellCoordinatePayload(row = index / gridSize, col = index % gridSize)
+                                            CellCoordinatePayload(
+                                                row = index / gridSize,
+                                                col = index % gridSize
+                                            )
                                         }
-                                        val claimedWordPayload = ClaimedWordPayload(word, coordinates)
+                                        val claimedWordPayload =
+                                            ClaimedWordPayload(word, coordinates)
 
                                         val payload = GameActionPayload(
                                             character = null,
@@ -363,9 +421,14 @@ fun GameScreen(navController: NavController, matchId: String?) {
                                             claimedWords = listOf(claimedWordPayload)
                                         )
                                         try {
-                                            gameService.submitAction(payload)
-                                            isSubmitted = true
+                                            val response = gameService.submitAction(payload)
+                                            if (response.status == 200) {
+                                                isSubmitted = true
+                                            } else {
+                                                snackbarHostState.showSnackbar(response.message ?: "Action failed")
+                                            }
                                         } catch (e: Exception) {
+                                            Log.e("submitAction", e.toString())
                                             snackbarHostState.showSnackbar("Failed: ${e.message}")
                                         }
                                     } else {
@@ -400,9 +463,9 @@ fun GameScreen(navController: NavController, matchId: String?) {
                         MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
                         RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
                     )
-                    .clickable { 
+                    .clickable {
                         isKeyboardVisible = false
-                        selectedCellIndexForInput = -1 
+                        selectedCellIndexForInput = -1
                     },
                 contentAlignment = Alignment.BottomCenter
             ) {
@@ -411,7 +474,8 @@ fun GameScreen(navController: NavController, matchId: String?) {
                     onCharClicked = { char ->
                         scope.launch {
                             if (selectedCellIndexForInput != -1 && userId == currentPlayer) {
-                                filledCell.value = Cell(index = selectedCellIndexForInput, char = char)
+                                filledCell.value =
+                                    Cell(index = selectedCellIndexForInput, char = char)
                             }
                             isKeyboardVisible = false
                             selectedCellIndexForInput = -1
@@ -579,10 +643,12 @@ private fun BottomGameControls(
             // Game Instructions
             Text(
                 text = when {
-                    phase == GamePhase.EDIT && isCurrentPlayer && !isSubmitted -> 
+                    phase == GamePhase.EDIT && isCurrentPlayer && !isSubmitted ->
                         "Tap an empty cell and select a letter"
-                    phase == GamePhase.SELECT && isCurrentPlayer && !isSubmitted -> 
+
+                    phase == GamePhase.SELECT && isCurrentPlayer && !isSubmitted ->
                         "Select cells to form a word"
+
                     else -> "Waiting for opponent..."
                 },
                 style = MaterialTheme.typography.bodyLarge.copy(
@@ -690,9 +756,9 @@ private fun PlayerInfoOverlay(
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                             )
-                            
+
                             Spacer(Modifier.height(8.dp))
-                            
+
                             Text(
                                 text = "Claimed Words:",
                                 style = MaterialTheme.typography.bodyMedium.copy(
@@ -700,9 +766,9 @@ private fun PlayerInfoOverlay(
                                     fontWeight = FontWeight.Medium
                                 )
                             )
-                            
+
                             Spacer(Modifier.height(4.dp))
-                            
+
                             if (player.claimedWords.isNotEmpty()) {
                                 player.claimedWords.forEach { word ->
                                     Text(

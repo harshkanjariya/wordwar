@@ -56,7 +56,7 @@ interface GameService {
     @POST("game/submit_action")
     suspend fun submitAction(
         @Body payload: GameActionPayload
-    )
+    ): ApiResponse<Unit>
 
     @GET("game/active")
     suspend fun getActiveGame(): ApiResponse<ActiveGameResponse>
