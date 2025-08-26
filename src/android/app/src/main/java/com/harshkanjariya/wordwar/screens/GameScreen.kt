@@ -2,25 +2,56 @@ package com.harshkanjariya.wordwar.screens
 
 import android.util.Log
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -110,13 +141,14 @@ fun GameScreen(navController: NavController, matchId: String?) {
 
     var activeGame by remember { mutableStateOf<GameData?>(null) }
     var showPlayerInfo by remember { mutableStateOf(false) }
-    
+    var voteEndGamePlayers by remember { mutableStateOf<List<String>>(emptyList()) }
+
     fun showGamifiedMessage(text: String, type: MessageType, icon: ImageVector? = null) {
         messageText = text
         messageType = type
         messageIcon = icon
         showMessage = true
-        
+
         scope.launch {
             val duration = when (type) {
                 MessageType.SUCCESS -> 4000L // Success messages stay longer
@@ -127,15 +159,17 @@ fun GameScreen(navController: NavController, matchId: String?) {
             delay(duration)
             showMessage = false
         }
-        
+
         // Add haptic feedback for different message types
         when (type) {
             MessageType.SUCCESS -> {
                 // Could add haptic feedback here
             }
+
             MessageType.ERROR -> {
                 // Could add haptic feedback here
             }
+
             else -> {}
         }
     }
@@ -158,19 +192,19 @@ fun GameScreen(navController: NavController, matchId: String?) {
                 val newWords = newPlayer.claimedWords.toSet()
                 val oldWords = oldPlayer.claimedWords.toSet()
                 val newlyClaimedWords = newWords - oldWords
-                
+
                 if (newlyClaimedWords.isNotEmpty()) {
                     // Combine all new words into one message
                     val totalPoints = newlyClaimedWords.sumOf { calculateWordPoints(it) }
                     val wordsList = newlyClaimedWords.joinToString(", ")
                     val wordCount = newlyClaimedWords.size
-                    
+
                     val message = if (wordCount == 1) {
                         "🎯 ${newPlayer.name} claimed '${newlyClaimedWords.first()}' (+$totalPoints points)!"
                     } else {
                         "🎯 ${newPlayer.name} claimed $wordCount words: $wordsList (+$totalPoints points total)!"
                     }
-                    
+
                     showGamifiedMessage(
                         message,
                         MessageType.SUCCESS,
@@ -198,7 +232,11 @@ fun GameScreen(navController: NavController, matchId: String?) {
                         onDisconnectRef.cancel()
                         isNavigatingToResults.value = true
                         scope.launch {
-                            showGamifiedMessage("Game has ended! 🏁", MessageType.INFO, Icons.Default.Info)
+                            showGamifiedMessage(
+                                "Game has ended! 🏁",
+                                MessageType.INFO,
+                                Icons.Default.Info
+                            )
                             delay(1000)
                             navController.navigate("game_results/$matchId") {
                                 popUpTo(navController.graph.id) { inclusive = true }
@@ -218,6 +256,10 @@ fun GameScreen(navController: NavController, matchId: String?) {
                     currentPlayer = gameData?.get("currentPlayer") as? String ?: ""
                     val newTurnTimestamp = gameData?.get("turnTimestamp") as? Long ?: 0L
                     val newPhase = phaseStringToEnum(gameData?.get("phase") as? String)
+                    
+                    // Update vote end game players
+                    val newVoteEndGamePlayers = gameData?.get("voteEndGame") as? List<String> ?: emptyList()
+                    voteEndGamePlayers = newVoteEndGamePlayers
 
                     if (phase != newPhase) {
                         phase = newPhase
@@ -236,7 +278,7 @@ fun GameScreen(navController: NavController, matchId: String?) {
                             try {
                                 val response = gameService.getActiveGame()
                                 val newGameData = response.data?.gameData
-                                
+
                                 // Check for new word claims
                                 if (newGameData != null && activeGame != null) {
                                     checkForNewWordClaims(activeGame!!, newGameData)
@@ -252,7 +294,13 @@ fun GameScreen(navController: NavController, matchId: String?) {
             }
 
             override fun onCancelled(error: DatabaseError) {
-                scope.launch { showGamifiedMessage("Failed to load game data: ${error.message}", MessageType.ERROR, Icons.Default.Warning) }
+                scope.launch {
+                    showGamifiedMessage(
+                        "Failed to load game data: ${error.message}",
+                        MessageType.ERROR,
+                        Icons.Default.Warning
+                    )
+                }
             }
         }
         gameRef.addValueEventListener(gameListener)
@@ -304,7 +352,18 @@ fun GameScreen(navController: NavController, matchId: String?) {
                 remainingTime = remainingTime,
                 currentPlayerId = currentPlayer,
                 activeGame = activeGame,
-                onBackClick = { navController.popBackStack() },
+                onExitClick = {
+                    scope.launch {
+                        gameRef.child("players").child(userId).child("status").onDisconnect()
+                            .cancel()
+                        val result = GameServiceHolder.api.quitGame()
+                        if (result.status == 200 && result.data != null) {
+                            navController.navigate("menu") {
+                                popUpTo(navController.graph.id) { inclusive = true }
+                            }
+                        }
+                    }
+                },
                 onPlayerInfoClick = { showPlayerInfo = true }
             )
 
@@ -345,15 +404,50 @@ fun GameScreen(navController: NavController, matchId: String?) {
                 isSubmitted = isSubmitted,
                 selectedCells = selectedCells,
                 filledCell = filledCell.value,
-                onEndGame = {
+                voteEndGamePlayers = voteEndGamePlayers,
+                currentUserId = userId,
+                onSpectate = {
                     scope.launch {
                         gameRef.child("players").child(userId).child("status").onDisconnect()
                             .cancel()
                         val result = GameServiceHolder.api.quitGame()
                         if (result.status == 200 && result.data != null) {
-                            navController.navigate("menu") {
-                                popUpTo(navController.graph.id) { inclusive = true }
+                            showGamifiedMessage(
+                                "You are now spectating! 👀",
+                                MessageType.INFO,
+                                Icons.Default.Info
+                            )
+                        }
+                    }
+                },
+                onVoteEndGame = {
+                    scope.launch {
+                        try {
+                            val isVoted = voteEndGamePlayers.contains(userId)
+                            if (isVoted) {
+                                val updatedVotes = voteEndGamePlayers.filter { it != userId }
+                                gameRef.child("voteEndGame").setValue(updatedVotes)
+                                showGamifiedMessage(
+                                    "Vote removed! 🗳️",
+                                    MessageType.INFO,
+                                    Icons.Default.Info
+                                )
+                            } else {
+                                // Add vote
+                                val updatedVotes = voteEndGamePlayers + userId
+                                gameRef.child("voteEndGame").setValue(updatedVotes)
+                                showGamifiedMessage(
+                                    "Vote added! 🗳️",
+                                    MessageType.INFO,
+                                    Icons.Default.Info
+                                )
                             }
+                        } catch (e: Exception) {
+                            showGamifiedMessage(
+                                "Failed to update vote: ${e.message}",
+                                MessageType.ERROR,
+                                Icons.Default.Warning
+                            )
                         }
                     }
                 },
@@ -373,12 +467,12 @@ fun GameScreen(navController: NavController, matchId: String?) {
                                 )
                                 try {
                                     val response = gameService.submitAction(payload)
-                                                                            if (response.status != 200) {
-                                            showGamifiedMessage(
-                                                response.message ?: "Action failed",
-                                                MessageType.ERROR,
-                                                Icons.Default.Warning
-                                            )
+                                    if (response.status != 200) {
+                                        showGamifiedMessage(
+                                            response.message ?: "Action failed",
+                                            MessageType.ERROR,
+                                            Icons.Default.Warning
+                                        )
                                     } else {
                                         showGamifiedMessage(
                                             "Letter placed successfully! 🎯",
@@ -470,7 +564,7 @@ fun GameScreen(navController: NavController, matchId: String?) {
         }
 
         // Floating Action Button for Submit
-            if (userId == currentPlayer && !isSubmitted) {
+        if (userId == currentPlayer && !isSubmitted) {
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
@@ -550,7 +644,7 @@ fun GameScreen(navController: NavController, matchId: String?) {
                                         try {
                                             val response = gameService.submitAction(payload)
                                             if (response.status == 200) {
-                                            isSubmitted = true
+                                                isSubmitted = true
                                                 val points = calculateWordPoints(word)
                                                 showGamifiedMessage(
                                                     "🎯 You claimed '$word' (+$points points)!",
@@ -602,12 +696,12 @@ fun GameScreen(navController: NavController, matchId: String?) {
         }
 
         // Enhanced Custom Keyboard Overlay
-            if (isKeyboardVisible) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
+        if (isKeyboardVisible) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
                     .height(300.dp)
-                        .align(Alignment.BottomCenter)
+                    .align(Alignment.BottomCenter)
                     .background(
                         MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
                         RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
@@ -616,24 +710,24 @@ fun GameScreen(navController: NavController, matchId: String?) {
                         isKeyboardVisible = false
                         selectedCellIndexForInput = -1
                     },
-                    contentAlignment = Alignment.BottomCenter
-                ) {
-                    CustomKeyboard(
-                        onBackspaceClicked = { filledCell.value = null },
-                        onCharClicked = { char ->
-                            scope.launch {
-                                if (selectedCellIndexForInput != -1 && userId == currentPlayer) {
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                CustomKeyboard(
+                    onBackspaceClicked = { filledCell.value = null },
+                    onCharClicked = { char ->
+                        scope.launch {
+                            if (selectedCellIndexForInput != -1 && userId == currentPlayer) {
                                 filledCell.value =
                                     Cell(index = selectedCellIndexForInput, char = char)
-                                }
-                                isKeyboardVisible = false
-                                selectedCellIndexForInput = -1
                             }
-                        },
-                        modifier = Modifier.align(Alignment.BottomCenter)
-                    )
-                }
+                            isKeyboardVisible = false
+                            selectedCellIndexForInput = -1
+                        }
+                    },
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                )
             }
+        }
 
         // Player Info Overlay (replaces bottom sheet)
         if (showPlayerInfo && activeGame != null) {
@@ -668,7 +762,7 @@ private fun TopGameStatusBar(
     remainingTime: Int,
     currentPlayerId: String,
     activeGame: GameData?,
-    onBackClick: () -> Unit,
+    onExitClick: () -> Unit,
     onPlayerInfoClick: () -> Unit
 ) {
     Card(
@@ -688,16 +782,16 @@ private fun TopGameStatusBar(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Back Button
+            // Exit Button
             IconButton(
-                onClick = onBackClick,
+                onClick = onExitClick,
                 modifier = Modifier.size(48.dp)
             ) {
                 Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Exit Game",
                     modifier = Modifier.size(24.dp),
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = MaterialTheme.colorScheme.error
                 )
             }
 
@@ -795,7 +889,10 @@ private fun BottomGameControls(
     isSubmitted: Boolean,
     selectedCells: Set<Int>,
     filledCell: Cell?,
-    onEndGame: () -> Unit,
+    voteEndGamePlayers: List<String>,
+    currentUserId: String,
+    onSpectate: () -> Unit,
+    onVoteEndGame: () -> Unit,
     onSubmit: () -> Unit
 ) {
     Card(
@@ -832,38 +929,107 @@ private fun BottomGameControls(
             Spacer(Modifier.height(16.dp))
 
             // Action Buttons
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxWidth()
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                OutlinedButton(
-                    onClick = onEndGame,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    ),
-                    border = BorderStroke(
-                        width = 2.dp,
-                        color = MaterialTheme.colorScheme.error
-                    )
+                // Game Control Buttons Row
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("End Game")
+                    // Spectate Button
+                    OutlinedButton(
+                        onClick = onSpectate,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.secondary
+                        ),
+                        border = BorderStroke(
+                            width = 2.dp,
+                            color = MaterialTheme.colorScheme.secondary
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = "Spectate",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Spectate",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+
+                    // Vote for End Game Button
+                    OutlinedButton(
+                        onClick = onVoteEndGame,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = if (voteEndGamePlayers.contains(currentUserId)) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.tertiary
+                            }
+                        ),
+                        border = BorderStroke(
+                            width = 2.dp,
+                            color = if (voteEndGamePlayers.contains(currentUserId)) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.tertiary
+                            }
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (voteEndGamePlayers.contains(currentUserId)) {
+                                Icons.Default.ThumbUp
+                            } else {
+                                Icons.Default.ThumbUp
+                            },
+                            contentDescription = "Vote",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = when {
+                                voteEndGamePlayers.isEmpty() -> "Vote for End Game"
+                                voteEndGamePlayers.contains(currentUserId) -> "Remove My Vote (${voteEndGamePlayers.size})"
+                                else -> "Vote for End Game (${voteEndGamePlayers.size})"
+                            },
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
                 }
 
+                // Submit Button (only for current player)
                 if (isCurrentPlayer && !isSubmitted) {
                     Button(
                         onClick = onSubmit,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                         enabled = when {
                             phase == GamePhase.EDIT -> filledCell != null
                             phase == GamePhase.SELECT -> selectedCells.isNotEmpty()
                             else -> false
-                        }
+                        },
+                        shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("Submit")
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = "Submit",
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Submit",
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
                     }
-                } else {
-                    Spacer(modifier = Modifier.weight(1f))
                 }
             }
         }
@@ -997,7 +1163,7 @@ private fun GamifiedMessageCard(
     var isVisible by remember { mutableStateOf(false) }
     var showProgress by remember { mutableStateOf(false) }
     var progressValue by remember { mutableStateOf(1f) }
-    
+
     val scale by animateFloatAsState(
         targetValue = if (isVisible) 1f else 0f,
         animationSpec = spring(
@@ -1018,7 +1184,7 @@ private fun GamifiedMessageCard(
         isVisible = true
         delay(100)
         showProgress = true
-        
+
         // Animate progress bar from 1.0 to 0.0 over the duration
         val startTime = System.currentTimeMillis()
         while (System.currentTimeMillis() - startTime < duration) {
@@ -1071,7 +1237,7 @@ private fun GamifiedMessageCard(
                             delay(200)
                             iconScale = 1f
                         }
-                        
+
                         Icon(
                             imageVector = icon,
                             contentDescription = message,
@@ -1097,15 +1263,15 @@ private fun GamifiedMessageCard(
                         onClick = onDismiss,
                         modifier = Modifier.size(32.dp)
                     ) {
-                                            Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Close",
-                        tint = Color.White.copy(alpha = 0.8f),
-                        modifier = Modifier.size(20.dp)
-                    )
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = Color.White.copy(alpha = 0.8f),
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 }
-                
+
                 // Progress Bar for auto-dismiss
                 if (showProgress) {
                     Spacer(Modifier.height(12.dp))
