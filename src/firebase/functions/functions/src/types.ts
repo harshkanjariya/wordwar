@@ -60,6 +60,11 @@ export interface LiveGame {
    * The timestamp of when the current turn started.
    */
   turnTimestamp: number;
+
+  /**
+   * Array of player IDs who have voted to end the game.
+   */
+  voteEndGame?: string[];
 }
 
 
@@ -73,6 +78,7 @@ export interface GameData {
   selectedCell: string;
   turnTimestamp: number;
   updatedAt: string;
+  voteEndGame?: string[];
 }
 
 // Define the overall structure of the API response.

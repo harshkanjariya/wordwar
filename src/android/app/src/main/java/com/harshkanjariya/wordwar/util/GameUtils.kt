@@ -37,25 +37,39 @@ fun getCellsInPath(
     val absDCol = abs(dCol)
 
     if (absDCol > absDRow) {
-        val colDirection = if (dCol > 0) 1 else -1
-        for (col in 0..absDCol) {
-            val currentCol = startCol + col * colDirection
-            path.add(startRow * gridSize + currentCol)
+        // Horizontal movement (same row, different columns)
+        if (dCol > 0) {
+            // Left to right: increasing column numbers
+            for (col in startCol..endCol) {
+                path.add(startRow * gridSize + col)
+            }
+        } else {
+            // Right to left: decreasing column numbers
+            for (col in startCol downTo endCol) {
+                path.add(startRow * gridSize + col)
+            }
         }
     }
     else if (absDRow > absDCol) {
-        val rowDirection = if (dRow > 0) 1 else -1
-        for (row in 0..absDRow) {
-            val currentRow = startRow + row * rowDirection
-            path.add(currentRow * gridSize + startCol)
+        // Vertical movement (same column, different rows)
+        if (dRow > 0) {
+            // Top to bottom: increasing row numbers
+            for (row in startRow..endRow) {
+                path.add(row * gridSize + startCol)
+            }
+        } else {
+            // Bottom to top: decreasing row numbers
+            for (row in startRow downTo endRow) {
+                path.add(row * gridSize + startCol)
+            }
         }
     }
     else {
-        val rowDirection = if (dRow > 0) 1 else -1
-        val colDirection = if (dCol > 0) 1 else -1
-        for (step in 0..absDCol) {
-            val currentRow = startRow + step * rowDirection
-            val currentCol = startCol + step * colDirection
+        // Diagonal movement - use proportional calculation for smooth diagonal paths
+        val maxSteps = maxOf(absDRow, absDCol)
+        for (step in 0..maxSteps) {
+            val currentRow = startRow + (step * dRow / maxSteps)
+            val currentCol = startCol + (step * dCol / maxSteps)
             path.add(currentRow * gridSize + currentCol)
         }
     }
