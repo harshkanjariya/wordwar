@@ -400,3 +400,64 @@ export async function updateProfile(body: UpdateProfileDto, user: FullDocument<U
     _id: user?._id,
   }, dataToUpdate);
 }
+
+export async function getUserStatistics(userId: string) {
+  try {
+    // Get all games where the user participated
+    const userGames = await repositories.game_history.findAll({
+      filter: {
+        players: userId
+      }
+    });
+
+    let totalGames = 0;
+    let gamesWon = 0;
+    let totalPoints = 0;
+
+    userGames.forEach(game => {
+      totalGames++;
+      
+      // Calculate points for claimed words
+      if (game.claimedWords && game.claimedWords[userId]) {
+        const userWords = game.claimedWords[userId];
+        userWords.forEach(word => {
+          totalPoints += word.length * 10; // 10 points per letter
+        });
+      }
+      
+      // Determine if user won (has the most points or tied for most)
+      if (game.claimedWords) {
+        const playerPoints: { [key: string]: number } = {};
+        
+        // Calculate points for each player
+        Object.entries(game.claimedWords).forEach(([playerId, words]) => {
+          playerPoints[playerId] = words.reduce((sum, word) => sum + word.length * 10, 0);
+        });
+        
+        // Find the highest score
+        const maxPoints = Math.max(...Object.values(playerPoints));
+        const userPoints = playerPoints[userId] || 0;
+        
+        // Check if user has the highest score (or tied)
+        if (userPoints === maxPoints) {
+          gamesWon++;
+        }
+      }
+    });
+
+    return {
+      totalGames,
+      gamesWon,
+      totalPoints,
+      winRate: totalGames > 0 ? Math.round((gamesWon / totalGames) * 100) : 0
+    };
+  } catch (error) {
+    console.error('Error fetching user statistics:', error);
+    return {
+      totalGames: 0,
+      gamesWon: 0,
+      totalPoints: 0,
+      winRate: 0
+    };
+  }
+}

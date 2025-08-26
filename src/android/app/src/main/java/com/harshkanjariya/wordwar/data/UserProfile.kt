@@ -10,3 +10,14 @@ data class UserProfile(
     @SerializedName("name")
     val name: String? = null,
 )
+
+data class UserStatistics(
+    @SerializedName("totalGames")
+    val totalGames: Int = 0,
+    @SerializedName("gamesWon")
+    val gamesWon: Int = 0,
+    @SerializedName("totalPoints")
+    val totalPoints: Int = 0,
+    @SerializedName("winRate")
+    val winRate: Int = 0
+)

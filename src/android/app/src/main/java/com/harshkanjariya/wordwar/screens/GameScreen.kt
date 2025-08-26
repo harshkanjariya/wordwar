@@ -302,6 +302,8 @@ fun GameScreen(navController: NavController, matchId: String?) {
                 isCurrentPlayer = userId == currentPlayer,
                 phase = phase,
                 remainingTime = remainingTime,
+                currentPlayerId = currentPlayer,
+                activeGame = activeGame,
                 onBackClick = { navController.popBackStack() },
                 onPlayerInfoClick = { showPlayerInfo = true }
             )
@@ -468,7 +470,7 @@ fun GameScreen(navController: NavController, matchId: String?) {
         }
 
         // Floating Action Button for Submit
-        if (userId == currentPlayer && !isSubmitted) {
+            if (userId == currentPlayer && !isSubmitted) {
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
@@ -548,7 +550,7 @@ fun GameScreen(navController: NavController, matchId: String?) {
                                         try {
                                             val response = gameService.submitAction(payload)
                                             if (response.status == 200) {
-                                                isSubmitted = true
+                                            isSubmitted = true
                                                 val points = calculateWordPoints(word)
                                                 showGamifiedMessage(
                                                     "🎯 You claimed '$word' (+$points points)!",
@@ -600,12 +602,12 @@ fun GameScreen(navController: NavController, matchId: String?) {
         }
 
         // Enhanced Custom Keyboard Overlay
-        if (isKeyboardVisible) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
+            if (isKeyboardVisible) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
                     .height(300.dp)
-                    .align(Alignment.BottomCenter)
+                        .align(Alignment.BottomCenter)
                     .background(
                         MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
                         RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
@@ -614,24 +616,24 @@ fun GameScreen(navController: NavController, matchId: String?) {
                         isKeyboardVisible = false
                         selectedCellIndexForInput = -1
                     },
-                contentAlignment = Alignment.BottomCenter
-            ) {
-                CustomKeyboard(
-                    onBackspaceClicked = { filledCell.value = null },
-                    onCharClicked = { char ->
-                        scope.launch {
-                            if (selectedCellIndexForInput != -1 && userId == currentPlayer) {
+                    contentAlignment = Alignment.BottomCenter
+                ) {
+                    CustomKeyboard(
+                        onBackspaceClicked = { filledCell.value = null },
+                        onCharClicked = { char ->
+                            scope.launch {
+                                if (selectedCellIndexForInput != -1 && userId == currentPlayer) {
                                 filledCell.value =
                                     Cell(index = selectedCellIndexForInput, char = char)
+                                }
+                                isKeyboardVisible = false
+                                selectedCellIndexForInput = -1
                             }
-                            isKeyboardVisible = false
-                            selectedCellIndexForInput = -1
-                        }
-                    },
-                    modifier = Modifier.align(Alignment.BottomCenter)
-                )
+                        },
+                        modifier = Modifier.align(Alignment.BottomCenter)
+                    )
+                }
             }
-        }
 
         // Player Info Overlay (replaces bottom sheet)
         if (showPlayerInfo && activeGame != null) {
@@ -664,6 +666,8 @@ private fun TopGameStatusBar(
     isCurrentPlayer: Boolean,
     phase: GamePhase,
     remainingTime: Int,
+    currentPlayerId: String,
+    activeGame: GameData?,
     onBackClick: () -> Unit,
     onPlayerInfoClick: () -> Unit
 ) {
@@ -703,7 +707,18 @@ private fun TopGameStatusBar(
             ) {
                 // Turn Status
                 Text(
-                    text = if (isCurrentPlayer) "Your Turn!" else "Opponent's Turn",
+                    text = if (isCurrentPlayer) {
+                        "Your Turn!"
+                    } else {
+                        // Find the current player's name from activeGame
+                        val currentPlayer = activeGame?.players?.find { it._id == currentPlayerId }
+                        val currentPlayerName = when {
+                            currentPlayer?.name.isNullOrBlank() -> "Opponent"
+                            currentPlayer?.name == "Unknown Player" -> "Opponent"
+                            else -> currentPlayer.name
+                        }
+                        "$currentPlayerName's Turn"
+                    },
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = if (isCurrentPlayer) {
