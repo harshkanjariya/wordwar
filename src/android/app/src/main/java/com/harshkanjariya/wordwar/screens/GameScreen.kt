@@ -497,8 +497,7 @@ fun GameScreen(navController: NavController, matchId: String?) {
                             } else if (phase == GamePhase.SELECT) {
                                 if (selectedCells.isNotEmpty()) {
                                     val word = buildString {
-                                        selectedCells.sorted()
-                                            .forEach { index -> append(cells[index]) }
+                                        selectedCells.forEach { index -> append(cells[index]) }
                                     }
                                     if (word.isNotBlank() && isWordValid(word) && !claimedWords.contains(
                                             word
