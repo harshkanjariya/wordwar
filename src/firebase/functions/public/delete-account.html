@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delete Account - WordWar</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #039BE5 0%, #01579B 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            color: white;
+        }
+        
+        .app-logo {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 20px;
+            display: block;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .content {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        
+        .content h2 {
+            color: #039BE5;
+            margin: 30px 0 15px 0;
+            font-size: 1.8rem;
+            border-bottom: 2px solid #039BE5;
+            padding-bottom: 10px;
+        }
+        
+        .content h3 {
+            color: #01579B;
+            margin: 20px 0 10px 0;
+            font-size: 1.3rem;
+        }
+        
+        .content p {
+            margin-bottom: 15px;
+            text-align: justify;
+        }
+        
+        .content ul {
+            margin: 15px 0;
+            padding-left: 30px;
+        }
+        
+        .content li {
+            margin-bottom: 8px;
+        }
+        
+        .warning-box {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .warning-box h3 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+        
+        .warning-box p {
+            color: #856404;
+            margin-bottom: 0;
+        }
+        
+        .steps-box {
+            background: #f0f8ff;
+            border: 2px solid #039BE5;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .steps-box h3 {
+            color: #039BE5;
+            margin-bottom: 15px;
+        }
+        
+        .step {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+        
+        .step-number {
+            background: #039BE5;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+        
+        .step-content {
+            flex: 1;
+        }
+        
+        .highlight {
+            background: #f0f8ff;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #039BE5;
+            margin: 20px 0;
+        }
+        
+        .footer {
+            text-align: center;
+            color: white;
+            opacity: 0.8;
+        }
+        
+        .back-button {
+            display: inline-block;
+            background: white;
+            color: #039BE5;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .back-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+        
+        .contact-info {
+            background: #e8f5e8;
+            border: 2px solid #28a745;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .contact-info h3 {
+            color: #155724;
+            margin-bottom: 10px;
+        }
+        
+        .contact-info p {
+            color: #155724;
+            margin-bottom: 5px;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .app-logo {
+                width: 100px;
+                height: 100px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="app_logo.png" alt="WordWar Logo" class="app-logo">
+            <h1>🗑️ Delete Account</h1>
+            <p>WordWar - Multiplayer Word Game</p>
+            <a href="/" class="back-button">← Back to Home</a>
+        </div>
+        
+        <div class="content">
+            <p>We're sorry to see you go! This page provides you with all the information you need to delete your WordWar account.</p>
+            
+            <div class="warning-box">
+                <h3>⚠️ Important: Account Deletion is Permanent</h3>
+                <p><strong>Deleting your account will permanently remove:</strong></p>
+                <ul>
+                    <li>All your game statistics and progress</li>
+                    <li>Your user profile and settings</li>
+                    <li>Game history and achievements</li>
+                    <li>All associated data and preferences</li>
+                </ul>
+                <p><strong>This action cannot be undone.</strong></p>
+            </div>
+            
+            <h2>How to Delete Your Account</h2>
+            
+            <div class="steps-box">
+                <h3>Method 1: Delete Account Through the App (Recommended)</h3>
+                
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <p>Open the WordWar app on your device</p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <p>Go to <strong>Profile</strong> (person icon) in the main menu</p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <p>Tap on <strong>Delete Account</strong></p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">5</div>
+                    <div class="step-content">
+                        <p>Read the confirmation message and type <strong>"DELETE"</strong> to confirm</p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-number">6</div>
+                    <div class="step-content">
+                        <p>Tap <strong>Delete Account</strong> to permanently remove your account</p>
+                    </div>
+                </div>
+            </div>
+            
+            <h2>Alternative Methods</h2>
+            
+            <h3>Method 2: Contact Support Team</h3>
+            <p>If you're unable to access the app or prefer assistance, you can contact our support team to request account deletion:</p>
+            
+            <div class="contact-info">
+                <h3>📧 Contact Support for Account Deletion</h3>
+                <p><strong>Email:</strong> games.minispirits1@gmail.com</p>
+                <p><strong>Subject:</strong> "Account Deletion Request"</p>
+                <p><strong>Response Time:</strong> Within 24 hours</p>
+            </div>
+            
+            <p>When contacting support, please include:</p>
+            <ul>
+                <li>Your Google account email address</li>
+                <li>Your WordWar username (if different)</li>
+                <li>Reason for account deletion (optional)</li>
+                <li>Confirmation that you understand the deletion is permanent</li>
+            </ul>
+            
+            <h2>What Happens After Deletion?</h2>
+            
+            <div class="highlight">
+                <p><strong>Immediate Effects:</strong></p>
+                <ul>
+                    <li>Your account becomes inaccessible</li>
+                    <li>All personal data is permanently removed from our servers</li>
+                    <li>Your username becomes available for other users</li>
+                    <li>You can create a new account with the same Google account if desired</li>
+                </ul>
+            </div>
+            
+            <h2>Data Retention Policy</h2>
+            
+            <p>In accordance with our privacy policy and applicable laws:</p>
+            <ul>
+                <li><strong>Immediate Deletion:</strong> Personal information, game data, and user preferences</li>
+                <li><strong>Legal Requirements:</strong> Some information may be retained if required by law</li>
+                <li><strong>Analytics Data:</strong> Anonymous, aggregated data may be retained for service improvement</li>
+                <li><strong>Backup Systems:</strong> Data may exist in backups for up to 30 days before permanent removal</li>
+            </ul>
+            
+            <h2>Before You Go</h2>
+            
+            <p>Consider these alternatives to account deletion:</p>
+            <ul>
+                <li><strong>Take a Break:</strong> Simply uninstall the app and return later</li>
+                <li><strong>Reset Progress:</strong> Start fresh while keeping your account</li>
+                <li><strong>Privacy Settings:</strong> Adjust your privacy preferences</li>
+                <li><strong>Contact Support:</strong> We're here to help with any issues</li>
+            </ul>
+            
+            <div class="highlight">
+                <p><strong>Need Help?</strong> If you're experiencing issues with the app or have concerns about your account, please contact our support team before deleting your account. We're committed to helping you have the best possible experience with WordWar.</p>
+            </div>
+            
+            <h2>Contact Information</h2>
+            
+            <p>If you have any questions about account deletion or need assistance:</p>
+            
+            <div class="contact-info">
+                <h3>📞 Support Channels</h3>
+                <p><strong>Email Support:</strong> games.minispirits1@gmail.com</p>
+                <p><strong>In-App Support:</strong> Available through the app's help section</p>
+                <p><strong>Response Time:</strong> Within 24 hours for all inquiries</p>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>&copy; 2025 WordWar. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

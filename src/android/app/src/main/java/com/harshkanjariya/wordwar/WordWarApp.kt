@@ -17,8 +17,11 @@ class WordWarApp : Application() {
         super.onCreate()
         context = applicationContext
 
-        Pluto.Installer(this)
-            .addPlugin(PlutoNetworkPlugin())
-            .install()
+        // Only initialize Pluto in debug builds
+        if (BuildConfig.DEBUG) {
+            Pluto.Installer(this)
+                .addPlugin(PlutoNetworkPlugin())
+                .install()
+        }
     }
 }

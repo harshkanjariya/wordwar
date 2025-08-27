@@ -1,0 +1,16 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://word-war-4.web.app/sitemap.xml
+
+# Disallow admin and private areas
+Disallow: /admin/
+Disallow: /private/
+Disallow: /api/
+
+# Allow important pages
+Allow: /privacy-policy.html
+Allow: /terms-of-service.html
+Allow: /support.html
+Allow: /contact.html

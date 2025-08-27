@@ -59,6 +59,7 @@ okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 okhttp-logging = { group = "com.squareup.okhttp3", name = "logging-interceptor", version = "5.1.0" }
 retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }
 pluto-core = { group = "com.androidpluto", name = "pluto", version.ref = "pluto" }
+pluto-core-noop = { group = "com.androidpluto", name = "pluto-no-op", version.ref = "pluto" }
 pluto-network = { group = "com.androidpluto.plugins", name = "network", version.ref = "pluto" }
 pluto-network-noop = { group = "com.androidpluto.plugins", name = "network-no-op", version.ref = "pluto" }
 

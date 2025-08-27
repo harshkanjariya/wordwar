@@ -33,16 +33,27 @@ android {
             }
             create("production") {
                 dimension = "env"
-                buildConfigField("String", "BACKEND_URL", "\"https://asia-south1-xkartindia.cloudfunctions.net/api/\"")
+                buildConfigField("String", "BACKEND_URL", "\"https://word-war-4.web.app/api/\"")
             }
         }
 
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            
+            ndk {
+                debugSymbolLevel = "FULL"
+            }
+        }
+    }
+    
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = true
         }
     }
     compileOptions {
@@ -101,6 +112,7 @@ dependencies {
 
     // Pluto core (only needed if using UI)
     debugImplementation(libs.pluto.core)
+    releaseImplementation(libs.pluto.core.noop)
 
     // Network plugin
     debugImplementation(libs.pluto.network)

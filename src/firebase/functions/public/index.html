@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WordWar - Multiplayer Word Game</title>
+    <meta name="description" content="Challenge your friends in WordWar, the exciting multiplayer word game where strategy meets vocabulary!">
+    <meta name="keywords" content="word game, multiplayer, puzzle, strategy, vocabulary, android game">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #039BE5 0%, #01579B 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+            color: white;
+        }
+        
+        .app-logo {
+            width: 150px;
+            height: 150px;
+            margin: 0 auto 30px;
+            display: block;
+            border-radius: 25px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
+        
+        .header h1 {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            animation: fadeInUp 1s ease-out;
+        }
+        
+        .header p {
+            font-size: 1.5rem;
+            opacity: 0.9;
+            margin-bottom: 30px;
+            animation: fadeInUp 1s ease-out 0.2s both;
+        }
+        
+        .cta-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+            animation: fadeInUp 1s ease-out 0.4s both;
+        }
+        
+        .cta-button {
+            display: inline-block;
+            background: #40C4FF;
+            color: white;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.3);
+            background: #00B0FF;
+        }
+        
+        .cta-button.secondary {
+            background: transparent;
+            border: 2px solid white;
+        }
+        
+        .cta-button.secondary:hover {
+            background: white;
+            color: #039BE5;
+        }
+        
+        .features {
+            background: white;
+            padding: 60px 40px;
+            border-radius: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            margin-bottom: 40px;
+            animation: fadeInUp 1s ease-out 0.6s both;
+        }
+        
+        .features h2 {
+            text-align: center;
+            color: #039BE5;
+            font-size: 2.5rem;
+            margin-bottom: 40px;
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+        }
+        
+        .feature-card {
+            text-align: center;
+            padding: 30px;
+            border-radius: 20px;
+            background: linear-gradient(135deg, #f0f8ff 0%, #e8f4fd 100%);
+            transition: transform 0.3s ease;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            display: block;
+        }
+        
+        .feature-card h3 {
+            color: #01579B;
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+        }
+        
+        .feature-card p {
+            color: #666;
+            line-height: 1.6;
+        }
+        
+        .gameplay {
+            background: white;
+            padding: 60px 40px;
+            border-radius: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            margin-bottom: 40px;
+            animation: fadeInUp 1s ease-out 0.8s both;
+        }
+        
+        .gameplay h2 {
+            text-align: center;
+            color: #039BE5;
+            font-size: 2.5rem;
+            margin-bottom: 40px;
+        }
+        
+        .gameplay-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            align-items: center;
+        }
+        
+        .gameplay-text h3 {
+            color: #01579B;
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+        }
+        
+        .gameplay-text p {
+            color: #666;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+        
+        .gameplay-visual {
+            text-align: center;
+            font-size: 8rem;
+            color: #039BE5;
+            animation: bounce 2s infinite;
+        }
+        
+        .legal-links {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            margin-bottom: 40px;
+            animation: fadeInUp 1s ease-out 1s both;
+        }
+        
+        .legal-links h2 {
+            text-align: center;
+            color: #039BE5;
+            font-size: 2rem;
+            margin-bottom: 30px;
+        }
+        
+        .legal-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        
+        .legal-link {
+            display: block;
+            background: #f0f8ff;
+            color: #039BE5;
+            padding: 20px;
+            text-decoration: none;
+            border-radius: 15px;
+            text-align: center;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+        
+        .legal-link:hover {
+            background: #039BE5;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        
+        .footer {
+            text-align: center;
+            color: white;
+            opacity: 0.8;
+            padding: 40px 0;
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% {
+                transform: translateY(0);
+            }
+            40% {
+                transform: translateY(-20px);
+            }
+            60% {
+                transform: translateY(-10px);
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2.5rem;
+            }
+            
+            .header p {
+                font-size: 1.2rem;
+            }
+            
+            .features, .gameplay {
+                padding: 40px 20px;
+            }
+            
+            .gameplay-content {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+            
+            .cta-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="app_logo.png" alt="WordWar App Logo" class="app-logo">
+            <h1>🎯 WordWar</h1>
+            <p>Challenge your vocabulary in the ultimate multiplayer word game!</p>
+            <div class="cta-buttons">
+                <a href="https://play.google.com/store/apps/details?id=com.harshkanjariya.wordwar" class="cta-button">
+                    🚀 Download Now
+                </a>
+                <a href="#features" class="cta-button secondary">
+                    📖 Learn More
+                </a>
+            </div>
+        </div>
+        
+        <div class="features" id="features">
+            <h2>🌟 Game Features</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <span class="feature-icon">🎮</span>
+                    <h3>Multiplayer Battles</h3>
+                    <p>Challenge friends and players worldwide in real-time word battles. Test your vocabulary against the best!</p>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">🧠</span>
+                    <h3>Strategic Gameplay</h3>
+                    <p>Create words strategically on the game board. Every move counts in this tactical word puzzle!</p>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">📊</span>
+                    <h3>Progress Tracking</h3>
+                    <p>Monitor your performance with detailed statistics, achievements, and leaderboards.</p>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">🔐</span>
+                    <h3>Secure Login</h3>
+                    <p>Quick and secure access with Google Sign-In. Your data is always protected.</p>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">⚡</span>
+                    <h3>Real-time Matchmaking</h3>
+                    <p>Find opponents instantly with our smart matchmaking system. No waiting, just playing!</p>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">🏆</span>
+                    <h3>Competitive Rankings</h3>
+                    <p>Climb the leaderboards and prove you're the ultimate word master!</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="gameplay">
+            <h2>🎲 How to Play</h2>
+            <div class="gameplay-content">
+                <div class="gameplay-text">
+                    <h3>Master the Word Grid</h3>
+                    <p>WordWar combines the best of word puzzles and strategy games. Players take turns placing letters on a grid to form words.</p>
+                    <p>Score points by creating longer words, using bonus tiles, and strategically blocking your opponent's moves.</p>
+                    <p>Think fast, plan ahead, and outsmart your competition in this addictive word battle!</p>
+                </div>
+                <div class="gameplay-visual">
+                    🎯
+                </div>
+            </div>
+        </div>
+        
+        <div class="legal-links">
+            <h2>📋 Legal Information</h2>
+            <div class="legal-grid">
+                <a href="/privacy-policy.html" class="legal-link">
+                    🔒 Privacy Policy
+                </a>
+                <a href="/terms-of-service.html" class="legal-link">
+                    📋 Terms of Service
+                </a>
+                <a href="/support.html" class="legal-link">
+                    🆘 Support & Help
+                </a>
+                <a href="/contact.html" class="legal-link">
+                    📧 Contact Us
+                </a>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>&copy; 2025 WordWar. All rights reserved. | Multiplayer word game for Android</p>
+        </div>
+    </div>
+</body>
+</html>
