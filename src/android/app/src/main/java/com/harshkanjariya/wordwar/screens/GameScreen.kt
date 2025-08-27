@@ -24,6 +24,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
@@ -89,6 +90,11 @@ data class Cell(
     val char: String
 )
 
+data class WordWithCoordinates(
+    val word: String,
+    val coordinates: List<CellCoordinatePayload>
+)
+
 enum class GamePhase {
     EDIT, SELECT
 }
@@ -114,6 +120,8 @@ fun GameScreen(navController: NavController, matchId: String?) {
     val filledCell = remember { mutableStateOf<Cell?>(null) }
     var claimedWords by remember { mutableStateOf(listOf<String>()) }
     var selectedCells by remember { mutableStateOf(emptySet<Int>()) }
+    // Add new state for selected words list
+    var selectedWords by remember { mutableStateOf(listOf<WordWithCoordinates>()) }
     val isNavigatingToResults = remember { mutableStateOf(false) }
     var isSubmitted by remember { mutableStateOf(false) }
 
@@ -176,6 +184,76 @@ fun GameScreen(navController: NavController, matchId: String?) {
 
     fun calculateWordPoints(word: String): Int {
         return word.length * 10
+    }
+
+    // Add function to add selected word to list
+    suspend fun addSelectedWord() {
+        if (selectedCells.isNotEmpty()) {
+            val word = buildString {
+                selectedCells.forEach { index -> append(cells[index]) }
+            }
+            if (word.isBlank()) {
+                showGamifiedMessage(
+                    "No word selected!",
+                    MessageType.WARNING,
+                    Icons.Default.Info
+                )
+                return
+            }
+            if (!isWordValid(word)) {
+                showGamifiedMessage(
+                    "Invalid word: '$word'",
+                    MessageType.ERROR,
+                    Icons.Default.Warning
+                )
+                return
+            }
+            if (claimedWords.contains(word)) {
+                showGamifiedMessage(
+                    "Word '$word' already claimed!",
+                    MessageType.ERROR,
+                    Icons.Default.Warning
+                )
+                return
+            }
+            if (selectedWords.any { it.word == word }) {
+                showGamifiedMessage(
+                    "Word '$word' already in your list!",
+                    MessageType.ERROR,
+                    Icons.Default.Warning
+                )
+                return
+            }
+            
+            selectedWords = selectedWords + WordWithCoordinates(word, selectedCells.map { index ->
+                CellCoordinatePayload(
+                    row = index / gridSize,
+                    col = index % gridSize
+                )
+            })
+            selectedCells = emptySet()
+            showGamifiedMessage(
+                "Added '$word' to your list! 📝",
+                MessageType.SUCCESS,
+                Icons.Default.CheckCircle
+            )
+        } else {
+            showGamifiedMessage(
+                "Select cells to form a word first! 🔤",
+                MessageType.WARNING,
+                Icons.Default.Info
+            )
+        }
+    }
+
+    // Add function to remove word from selected list
+    fun removeSelectedWord(word: String) {
+        selectedWords = selectedWords.filter { it.word != word }
+        showGamifiedMessage(
+            "Removed '$word' from your list! 🗑️",
+            MessageType.INFO,
+            Icons.Default.Info
+        )
     }
 
     fun checkForNewWordClaims(oldGameData: GameData, newGameData: GameData) {
@@ -257,6 +335,8 @@ fun GameScreen(navController: NavController, matchId: String?) {
 
                     if (phase != newPhase) {
                         phase = newPhase
+                        // Reset selected words when phase changes
+                        selectedWords = emptyList()
                     }
 
                     selectedCellIndexForInput = -1
@@ -405,6 +485,13 @@ fun GameScreen(navController: NavController, matchId: String?) {
                     filledCell = filledCell.value,
                     voteEndGamePlayers = voteEndGamePlayers,
                     currentUserId = userId,
+                    selectedWords = selectedWords,
+                    onAddWord = { 
+                        scope.launch {
+                            addSelectedWord()
+                        }
+                    },
+                    onRemoveWord = { removeSelectedWord(it) },
                     onSpectate = {
                         scope.launch {
                             gameRef.child("players").child(userId).child("status").onDisconnect()
@@ -495,64 +582,48 @@ fun GameScreen(navController: NavController, matchId: String?) {
                                 }
 
                             } else if (phase == GamePhase.SELECT) {
-                                if (selectedCells.isNotEmpty()) {
-                                    val word = buildString {
-                                        selectedCells.forEach { index -> append(cells[index]) }
+                                if (selectedWords.isNotEmpty()) {
+                                    val claimedWordPayloads = selectedWords.map { wordWithCoords ->
+                                        ClaimedWordPayload(wordWithCoords.word, wordWithCoords.coordinates)
                                     }
-                                    if (word.isNotBlank() && isWordValid(word) && !claimedWords.contains(
-                                            word
-                                        )
-                                    ) {
-                                        val coordinates = selectedCells.map { index ->
-                                            CellCoordinatePayload(
-                                                row = index / gridSize,
-                                                col = index % gridSize
-                                            )
-                                        }
-                                        val claimedWordPayload =
-                                            ClaimedWordPayload(word, coordinates)
-
-                                        val payload = GameActionPayload(
-                                            character = null,
-                                            row = null,
-                                            col = null,
-                                            claimedWords = listOf(claimedWordPayload)
-                                        )
-                                        try {
-                                            val response = gameService.submitAction(payload)
-                                            if (response.status == 200) {
-                                                isSubmitted = true
-                                                val points = calculateWordPoints(word)
-                                                showGamifiedMessage(
-                                                    "🎯 You claimed '$word' (+$points points)!",
-                                                    MessageType.SUCCESS,
-                                                    Icons.Default.ThumbUp
-                                                )
-                                            } else {
-                                                showGamifiedMessage(
-                                                    response.message ?: "Action failed",
-                                                    MessageType.ERROR,
-                                                    Icons.Default.Warning
-                                                )
-                                            }
-                                        } catch (e: Exception) {
-                                            Log.e("submitAction", e.toString())
+                                    
+                                    val payload = GameActionPayload(
+                                        character = null,
+                                        row = null,
+                                        col = null,
+                                        claimedWords = claimedWordPayloads
+                                    )
+                                    
+                                    try {
+                                        val response = gameService.submitAction(payload)
+                                        if (response.status == 200) {
+                                            isSubmitted = true
+                                            val totalPoints = selectedWords.sumOf { calculateWordPoints(it.word) }
+                                            val wordsList = selectedWords.joinToString(", ") { it.word }
                                             showGamifiedMessage(
-                                                "Failed: ${e.message}",
+                                                "🎯 You claimed ${selectedWords.size} words: $wordsList (+$totalPoints points total)!",
+                                                MessageType.SUCCESS,
+                                                Icons.Default.ThumbUp
+                                            )
+                                            selectedWords = emptyList() // Clear the list after successful submission
+                                        } else {
+                                            showGamifiedMessage(
+                                                response.message ?: "Action failed",
                                                 MessageType.ERROR,
                                                 Icons.Default.Warning
                                             )
                                         }
-                                    } else {
+                                    } catch (e: Exception) {
+                                        Log.e("submitAction", e.toString())
                                         showGamifiedMessage(
-                                            "Invalid or already claimed word! ❌",
+                                            "Failed: ${e.message}",
                                             MessageType.ERROR,
                                             Icons.Default.Warning
                                         )
                                     }
                                 } else {
                                     showGamifiedMessage(
-                                        "Select cells to form a word! 🔤",
+                                        "Add some words to your list first! 📝",
                                         MessageType.WARNING,
                                         Icons.Default.Info
                                     )
@@ -759,6 +830,9 @@ private fun BottomGameControls(
     filledCell: Cell?,
     voteEndGamePlayers: List<String>,
     currentUserId: String,
+    selectedWords: List<WordWithCoordinates>,
+    onAddWord: () -> Unit,
+    onRemoveWord: (String) -> Unit,
     onSpectate: () -> Unit,
     onVoteEndGame: () -> Unit,
     onSubmit: () -> Unit
@@ -784,7 +858,7 @@ private fun BottomGameControls(
                         "Tap an empty cell and select a letter"
 
                     phase == GamePhase.SELECT && isCurrentPlayer && !isSubmitted ->
-                        "Select cells to form a word"
+                        "Select cells to form a word, then add it to your list"
 
                     else -> "Waiting for opponent..."
                 },
@@ -796,11 +870,94 @@ private fun BottomGameControls(
 
             Spacer(Modifier.height(16.dp))
 
-            // Action Buttons
+            // Selected Words List (only show in SELECT phase)
+            if (phase == GamePhase.SELECT && selectedWords.isNotEmpty()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Selected Words (${selectedWords.size}):",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        )
+                        
+                        Spacer(Modifier.height(8.dp))
+                        
+                        selectedWords.forEach { wordWithCoords ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "• ${wordWithCoords.word}",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    ),
+                                    modifier = Modifier.weight(1f)
+                                )
+                                
+                                if (isCurrentPlayer && !isSubmitted) {
+                                    IconButton(
+                                        onClick = { onRemoveWord(wordWithCoords.word) },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Remove word",
+                                            tint = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                Spacer(Modifier.height(16.dp))
+            }
+
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                if (phase == GamePhase.SELECT && isCurrentPlayer && !isSubmitted) {
+                    Button(
+                        onClick = onAddWord,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = selectedCells.isNotEmpty(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondary
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Add Word",
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Add Word",
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
+                    }
+                }
+
                 // Game Control Buttons Row
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -859,7 +1016,7 @@ private fun BottomGameControls(
                                 Icons.Default.ThumbUp
                             },
                             contentDescription = "Vote",
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
@@ -880,7 +1037,7 @@ private fun BottomGameControls(
                         modifier = Modifier.fillMaxWidth(),
                         enabled = when {
                             phase == GamePhase.EDIT -> filledCell != null
-                            phase == GamePhase.SELECT -> selectedCells.isNotEmpty()
+                            phase == GamePhase.SELECT -> selectedWords.isNotEmpty()
                             else -> false
                         },
                         shape = RoundedCornerShape(12.dp)
