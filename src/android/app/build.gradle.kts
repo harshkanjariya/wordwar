@@ -19,13 +19,26 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("../../../keys/wordwar.jks")
+            storePassword = "wordwarspirits"
+            keyAlias = "release"
+            keyPassword = "wordwarspirits"
+        }
+    }
+
     buildTypes {
         flavorDimensions += "env"
 
         productFlavors {
             create("local") {
                 dimension = "env"
-                buildConfigField("String", "BACKEND_URL", "\"http://192.168.1.4:5001/word-war-4/asia-south1/api/api/\"")
+                buildConfigField(
+                    "String",
+                    "BACKEND_URL",
+                    "\"http://192.168.1.4:5001/word-war-4/asia-south1/api/api/\""
+                )
             }
             create("staging") {
                 dimension = "env"
@@ -40,17 +53,18 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            
+
             ndk {
                 debugSymbolLevel = "FULL"
             }
         }
     }
-    
+
     packagingOptions {
         jniLibs {
             useLegacyPackaging = true
