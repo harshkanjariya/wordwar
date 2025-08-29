@@ -13,13 +13,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -104,7 +108,21 @@ fun phaseStringToEnum(phase: String?): GamePhase {
     return GamePhase.EDIT
 }
 
-// Gamified Message System Types
+@Composable
+fun AdaptiveSystemPadding(
+    content: @Composable () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.statusBars)
+            .windowInsetsPadding(WindowInsets.navigationBars)
+    ) {
+        content()
+    }
+}
+
+
 enum class MessageType {
     INFO, SUCCESS, WARNING, ERROR
 }
@@ -224,7 +242,7 @@ fun GameScreen(navController: NavController, matchId: String?) {
                 )
                 return
             }
-            
+
             selectedWords = selectedWords + WordWithCoordinates(word, selectedCells.map { index ->
                 CellCoordinatePayload(
                     row = index / gridSize,
@@ -258,6 +276,7 @@ fun GameScreen(navController: NavController, matchId: String?) {
 
     fun checkForNewWordClaims(oldGameData: GameData, newGameData: GameData) {
         newGameData.players.forEach { newPlayer ->
+            if (newPlayer._id == userId) return
             val oldPlayer = oldGameData.players.find { it._id == newPlayer._id }
             if (oldPlayer != null) {
                 val newWords = newPlayer.claimedWords.toSet()
@@ -408,265 +427,277 @@ fun GameScreen(navController: NavController, matchId: String?) {
         selectedCellIndexForInput = -1
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-        contentAlignment = Alignment.BottomCenter
-    ) {
-        // Main layout with status bar and scrollable content
-        Column(
-            modifier = Modifier.fillMaxSize()
+    AdaptiveSystemPadding {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+            contentAlignment = Alignment.BottomCenter
         ) {
-            // Top Game Status Bar (Sticky)
-            TopGameStatusBar(
-                isCurrentPlayer = userId == currentPlayer,
-                phase = phase,
-                remainingTime = remainingTime,
-                currentPlayerId = currentPlayer,
-                activeGame = activeGame,
-                onExitClick = {
-                    scope.launch {
-                        gameRef.child("players").child(userId).child("status").onDisconnect()
-                            .cancel()
-                        val result = GameServiceHolder.api.quitGame()
-                        if (result.status == 200 && result.data != null) {
-                            navController.navigate("menu") {
-                                popUpTo(navController.graph.id) { inclusive = true }
-                            }
-                        }
-                    }
-                },
-                onPlayerInfoClick = { showPlayerInfo = true }
-            )
-
-            // Scrollable Game Content
             Column(
                 modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 16.dp)
-                    .verticalScroll(rememberScrollState())
+                    .fillMaxSize()
+                    .padding(top = 6.dp)
             ) {
-                // Game Grid Section
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    WordGrid(
-                        gridSize = gridSize,
-                        cells = cells,
-                        currentMode = phase,
-                        filledCell = filledCell.value,
-                        highlightFilledCell = (phase == GamePhase.EDIT),
-                        onCellClick = { index ->
-                            if (phase == GamePhase.EDIT && currentPlayer == userId && !isSubmitted) {
-                                if (cells[index].isBlank()) {
-                                    isKeyboardVisible = true
-                                    selectedCellIndexForInput = index
-                                } else if (index == filledCell.value?.index) {
-                                    filledCell.value = null
-                                }
-                            }
-                        },
-                        onCellsSelected = { newCells ->
-                            if (phase == GamePhase.SELECT) selectedCells = newCells
-                        },
-                        selectedCells = selectedCells
-                    )
-                }
-
-                BottomGameControls(
-                    phase = phase,
+                // Top Game Status Bar (Sticky)
+                TopGameStatusBar(
                     isCurrentPlayer = userId == currentPlayer,
-                    isSubmitted = isSubmitted,
-                    selectedCells = selectedCells,
-                    filledCell = filledCell.value,
-                    voteEndGamePlayers = voteEndGamePlayers,
-                    currentUserId = userId,
-                    selectedWords = selectedWords,
-                    onAddWord = { 
-                        scope.launch {
-                            addSelectedWord()
-                        }
-                    },
-                    onRemoveWord = { removeSelectedWord(it) },
-                    onSpectate = {
+                    phase = phase,
+                    remainingTime = remainingTime,
+                    currentPlayerId = currentPlayer,
+                    activeGame = activeGame,
+                    onExitClick = {
                         scope.launch {
                             gameRef.child("players").child(userId).child("status").onDisconnect()
                                 .cancel()
                             val result = GameServiceHolder.api.quitGame()
                             if (result.status == 200 && result.data != null) {
-                                showGamifiedMessage(
-                                    "You are now spectating! 👀",
-                                    MessageType.INFO,
-                                    Icons.Default.Info
-                                )
+                                navController.navigate("menu") {
+                                    popUpTo(navController.graph.id) { inclusive = true }
+                                }
                             }
                         }
                     },
-                    onVoteEndGame = {
-                        scope.launch {
-                            try {
-                                val isVoted = voteEndGamePlayers.contains(userId)
-                                if (isVoted) {
-                                    val updatedVotes = voteEndGamePlayers.filter { it != userId }
-                                    gameRef.child("voteEndGame").setValue(updatedVotes)
-                                    showGamifiedMessage(
-                                        "Vote removed! 🗳️",
-                                        MessageType.INFO,
-                                        Icons.Default.Info
-                                    )
-                                } else {
-                                    // Add vote
-                                    val updatedVotes = voteEndGamePlayers + userId
-                                    gameRef.child("voteEndGame").setValue(updatedVotes)
-                                    showGamifiedMessage(
-                                        "Vote added! 🗳️",
-                                        MessageType.INFO,
-                                        Icons.Default.Info
-                                    )
-                                }
-                            } catch (e: Exception) {
-                                showGamifiedMessage(
-                                    "Failed to update vote: ${e.message}",
-                                    MessageType.ERROR,
-                                    Icons.Default.Warning
-                                )
-                            }
-                        }
-                    },
-                    onSubmit = {
-                        scope.launch {
-                            if (phase == GamePhase.EDIT) {
-                                val character = filledCell.value?.char
-                                val row = filledCell.value?.index?.div(gridSize)
-                                val col = filledCell.value?.index?.rem(gridSize)
-
-                                if (character != null && row != null && col != null) {
-                                    val payload = GameActionPayload(
-                                        character = character,
-                                        row = row,
-                                        col = col,
-                                        claimedWords = emptyList()
-                                    )
-                                    try {
-                                        val response = gameService.submitAction(payload)
-                                        if (response.status != 200) {
-                                            showGamifiedMessage(
-                                                response.message ?: "Action failed",
-                                                MessageType.ERROR,
-                                                Icons.Default.Warning
-                                            )
-                                        } else {
-                                            showGamifiedMessage(
-                                                "Letter placed successfully! 🎯",
-                                                MessageType.SUCCESS,
-                                                Icons.Default.CheckCircle
-                                            )
-                                        }
-                                    } catch (e: Exception) {
-                                        showGamifiedMessage(
-                                            "Failed: ${e.message}",
-                                            MessageType.ERROR,
-                                            Icons.Default.Warning
-                                        )
-                                    }
-                                } else {
-                                    showGamifiedMessage(
-                                        "Pick a cell and letter first! 📝",
-                                        MessageType.WARNING,
-                                        Icons.Default.Edit
-                                    )
-                                }
-
-                            } else if (phase == GamePhase.SELECT) {
-                                if (selectedWords.isNotEmpty()) {
-                                    val claimedWordPayloads = selectedWords.map { wordWithCoords ->
-                                        ClaimedWordPayload(wordWithCoords.word, wordWithCoords.coordinates)
-                                    }
-                                    
-                                    val payload = GameActionPayload(
-                                        character = null,
-                                        row = null,
-                                        col = null,
-                                        claimedWords = claimedWordPayloads
-                                    )
-                                    
-                                    try {
-                                        val response = gameService.submitAction(payload)
-                                        if (response.status == 200) {
-                                            isSubmitted = true
-                                            val totalPoints = selectedWords.sumOf { calculateWordPoints(it.word) }
-                                            val wordsList = selectedWords.joinToString(", ") { it.word }
-                                            showGamifiedMessage(
-                                                "🎯 You claimed ${selectedWords.size} words: $wordsList (+$totalPoints points total)!",
-                                                MessageType.SUCCESS,
-                                                Icons.Default.ThumbUp
-                                            )
-                                            selectedWords = emptyList() // Clear the list after successful submission
-                                        } else {
-                                            showGamifiedMessage(
-                                                response.message ?: "Action failed",
-                                                MessageType.ERROR,
-                                                Icons.Default.Warning
-                                            )
-                                        }
-                                    } catch (e: Exception) {
-                                        Log.e("submitAction", e.toString())
-                                        showGamifiedMessage(
-                                            "Failed: ${e.message}",
-                                            MessageType.ERROR,
-                                            Icons.Default.Warning
-                                        )
-                                    }
-                                } else {
-                                    showGamifiedMessage(
-                                        "Add some words to your list first! 📝",
-                                        MessageType.WARNING,
-                                        Icons.Default.Info
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    onPlayerInfoClick = { showPlayerInfo = true }
                 )
-            }
-        }
 
-        if (isKeyboardVisible) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.BottomCenter)
-                    .background(
-                        MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
-                        RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-                    )
-                    .clickable {
-                        isKeyboardVisible = false
-                        selectedCellIndexForInput = -1
-                    },
-                contentAlignment = Alignment.BottomCenter
-            ) {
-                CustomKeyboard(
-                    onBackspaceClicked = { filledCell.value = null },
-                    onCharClicked = { char ->
-                        scope.launch {
-                            if (selectedCellIndexForInput != -1 && userId == currentPlayer) {
-                                filledCell.value =
-                                    Cell(index = selectedCellIndexForInput, char = char)
+                // Scrollable Game Content
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 16.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    // Game Grid Section
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        WordGrid(
+                            gridSize = gridSize,
+                            cells = cells,
+                            currentMode = phase,
+                            filledCell = filledCell.value,
+                            highlightFilledCell = (phase == GamePhase.EDIT),
+                            onCellClick = { index ->
+                                if (phase == GamePhase.EDIT && currentPlayer == userId && !isSubmitted) {
+                                    if (cells[index].isBlank()) {
+                                        isKeyboardVisible = true
+                                        selectedCellIndexForInput = index
+                                    } else if (index == filledCell.value?.index) {
+                                        filledCell.value = null
+                                    }
+                                }
+                            },
+                            onCellsSelected = { newCells ->
+                                if (phase == GamePhase.SELECT) selectedCells = newCells
+                            },
+                            selectedCells = selectedCells
+                        )
+                    }
+
+                    BottomGameControls(
+                        phase = phase,
+                        isCurrentPlayer = userId == currentPlayer,
+                        isSubmitted = isSubmitted,
+                        selectedCells = selectedCells,
+                        filledCell = filledCell.value,
+                        voteEndGamePlayers = voteEndGamePlayers,
+                        currentUserId = userId,
+                        selectedWords = selectedWords,
+                        onAddWord = {
+                            scope.launch {
+                                addSelectedWord()
                             }
+                        },
+                        onRemoveWord = { removeSelectedWord(it) },
+                        onSpectate = {
+                            scope.launch {
+                                gameRef.child("players").child(userId).child("status")
+                                    .onDisconnect()
+                                    .cancel()
+                                val result = GameServiceHolder.api.quitGame()
+                                if (result.status == 200 && result.data != null) {
+                                    showGamifiedMessage(
+                                        "You are now spectating! 👀",
+                                        MessageType.INFO,
+                                        Icons.Default.Info
+                                    )
+                                }
+                            }
+                        },
+                        onVoteEndGame = {
+                            scope.launch {
+                                try {
+                                    val isVoted = voteEndGamePlayers.contains(userId)
+                                    if (isVoted) {
+                                        val updatedVotes =
+                                            voteEndGamePlayers.filter { it != userId }
+                                        gameRef.child("voteEndGame").setValue(updatedVotes)
+                                        showGamifiedMessage(
+                                            "Vote removed! 🗳️",
+                                            MessageType.INFO,
+                                            Icons.Default.Info
+                                        )
+                                    } else {
+                                        // Add vote
+                                        val updatedVotes = voteEndGamePlayers + userId
+                                        gameRef.child("voteEndGame").setValue(updatedVotes)
+                                        showGamifiedMessage(
+                                            "Vote added! 🗳️",
+                                            MessageType.INFO,
+                                            Icons.Default.Info
+                                        )
+                                    }
+                                } catch (e: Exception) {
+                                    showGamifiedMessage(
+                                        "Failed to update vote: ${e.message}",
+                                        MessageType.ERROR,
+                                        Icons.Default.Warning
+                                    )
+                                }
+                            }
+                        },
+                        onSubmit = {
+                            scope.launch {
+                                if (phase == GamePhase.EDIT) {
+                                    val character = filledCell.value?.char
+                                    val row = filledCell.value?.index?.div(gridSize)
+                                    val col = filledCell.value?.index?.rem(gridSize)
+
+                                    if (character != null && row != null && col != null) {
+                                        val payload = GameActionPayload(
+                                            character = character,
+                                            row = row,
+                                            col = col,
+                                            claimedWords = emptyList()
+                                        )
+                                        try {
+                                            val response = gameService.submitAction(payload)
+                                            if (response.status != 200) {
+                                                showGamifiedMessage(
+                                                    response.message ?: "Action failed",
+                                                    MessageType.ERROR,
+                                                    Icons.Default.Warning
+                                                )
+                                            } else {
+                                                showGamifiedMessage(
+                                                    "Letter placed successfully! 🎯",
+                                                    MessageType.SUCCESS,
+                                                    Icons.Default.CheckCircle
+                                                )
+                                            }
+                                        } catch (e: Exception) {
+                                            showGamifiedMessage(
+                                                "Failed: ${e.message}",
+                                                MessageType.ERROR,
+                                                Icons.Default.Warning
+                                            )
+                                        }
+                                    } else {
+                                        showGamifiedMessage(
+                                            "Pick a cell and letter first! 📝",
+                                            MessageType.WARNING,
+                                            Icons.Default.Edit
+                                        )
+                                    }
+
+                                } else if (phase == GamePhase.SELECT) {
+                                    if (selectedWords.isNotEmpty()) {
+                                        val claimedWordPayloads =
+                                            selectedWords.map { wordWithCoords ->
+                                                ClaimedWordPayload(
+                                                    wordWithCoords.word,
+                                                    wordWithCoords.coordinates
+                                                )
+                                            }
+
+                                        val payload = GameActionPayload(
+                                            character = null,
+                                            row = null,
+                                            col = null,
+                                            claimedWords = claimedWordPayloads
+                                        )
+
+                                        try {
+                                            val response = gameService.submitAction(payload)
+                                            if (response.status == 200) {
+                                                isSubmitted = true
+                                                val totalPoints =
+                                                    selectedWords.sumOf { calculateWordPoints(it.word) }
+                                                val wordsList =
+                                                    selectedWords.joinToString(", ") { it.word }
+                                                showGamifiedMessage(
+                                                    "🎯 You claimed ${selectedWords.size} words: $wordsList (+$totalPoints points total)!",
+                                                    MessageType.SUCCESS,
+                                                    Icons.Default.ThumbUp
+                                                )
+                                                selectedWords =
+                                                    emptyList() // Clear the list after successful submission
+                                            } else {
+                                                showGamifiedMessage(
+                                                    response.message ?: "Action failed",
+                                                    MessageType.ERROR,
+                                                    Icons.Default.Warning
+                                                )
+                                            }
+                                        } catch (e: Exception) {
+                                            Log.e("submitAction", e.toString())
+                                            showGamifiedMessage(
+                                                "Failed: ${e.message}",
+                                                MessageType.ERROR,
+                                                Icons.Default.Warning
+                                            )
+                                        }
+                                    } else {
+                                        showGamifiedMessage(
+                                            "Add some words to your list first! 📝",
+                                            MessageType.WARNING,
+                                            Icons.Default.Info
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    )
+                }
+            }
+
+            if (isKeyboardVisible) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .background(
+                            MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+                            RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+                        )
+                        .clickable {
                             isKeyboardVisible = false
                             selectedCellIndexForInput = -1
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
+                        },
+                    contentAlignment = Alignment.BottomCenter
+                ) {
+                    CustomKeyboard(
+                        onBackspaceClicked = { filledCell.value = null },
+                        onCharClicked = { char ->
+                            scope.launch {
+                                if (selectedCellIndexForInput != -1 && userId == currentPlayer) {
+                                    filledCell.value =
+                                        Cell(index = selectedCellIndexForInput, char = char)
+                                }
+                                isKeyboardVisible = false
+                                selectedCellIndexForInput = -1
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         }
-    }
+    } // End of AdaptiveSystemPadding
 
 
     // Player Info Overlay (replaces bottom sheet)
@@ -707,7 +738,7 @@ private fun TopGameStatusBar(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
@@ -840,7 +871,7 @@ private fun BottomGameControls(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
@@ -889,9 +920,9 @@ private fun BottomGameControls(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                         )
-                        
+
                         Spacer(Modifier.height(8.dp))
-                        
+
                         selectedWords.forEach { wordWithCoords ->
                             Row(
                                 modifier = Modifier
@@ -907,7 +938,7 @@ private fun BottomGameControls(
                                     ),
                                     modifier = Modifier.weight(1f)
                                 )
-                                
+
                                 if (isCurrentPlayer && !isSubmitted) {
                                     IconButton(
                                         onClick = { onRemoveWord(wordWithCoords.word) },
@@ -925,7 +956,7 @@ private fun BottomGameControls(
                         }
                     }
                 }
-                
+
                 Spacer(Modifier.height(16.dp))
             }
 

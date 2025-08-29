@@ -37,7 +37,7 @@ android {
                 buildConfigField(
                     "String",
                     "BACKEND_URL",
-                    "\"http://192.168.1.4:5001/word-war-4/asia-south1/api/api/\""
+                    "\"https://word-war-4.web.app/api/\""
                 )
             }
             create("staging") {
