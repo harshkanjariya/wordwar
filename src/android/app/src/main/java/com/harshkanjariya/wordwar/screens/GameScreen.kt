@@ -172,7 +172,8 @@ fun GameScreen(navController: NavController, matchId: String?) {
     var activeGame by remember { mutableStateOf<GameData?>(null) }
     var showPlayerInfo by remember { mutableStateOf(false) }
     var voteEndGamePlayers by remember { mutableStateOf<List<String>>(emptyList()) }
-    var isSubmitting by remember { mutableStateOf(false) } // Add loading state for submit
+    var isSubmitting by remember { mutableStateOf(false) }
+    var isSkippingTurn by remember { mutableStateOf(false) } // Add loading state for submit
     var showMenu by remember { mutableStateOf(false) } // Add state for overflow menu
 
     fun showGamifiedMessage(text: String, type: MessageType, icon: ImageVector? = null) {
@@ -560,6 +561,7 @@ fun GameScreen(navController: NavController, matchId: String?) {
                         isCurrentPlayer = userId == currentPlayer,
                         isSubmitted = isSubmitted,
                         isSubmitting = isSubmitting,
+                        isSkippingTurn = isSkippingTurn,
                         selectedCells = selectedCells,
                         filledCell = filledCell.value,
                         selectedWords = selectedWords,
@@ -571,6 +573,8 @@ fun GameScreen(navController: NavController, matchId: String?) {
                         onRemoveWord = { removeSelectedWord(it) },
                         onSkipTurn = {
                             scope.launch {
+                                if (isSkippingTurn) return@launch // Prevent multiple calls
+                                isSkippingTurn = true
                                 try {
                                     val data = hashMapOf("gameId" to matchId)
                                     functions.getHttpsCallable("skipTurn").call(data).await()
@@ -585,6 +589,8 @@ fun GameScreen(navController: NavController, matchId: String?) {
                                         MessageType.ERROR,
                                         Icons.Default.Warning
                                     )
+                                } finally {
+                                    isSkippingTurn = false // Always reset the loading state
                                 }
                             }
                         },
@@ -956,6 +962,7 @@ private fun BottomGameControls(
     isCurrentPlayer: Boolean,
     isSubmitted: Boolean,
     isSubmitting: Boolean,
+    isSkippingTurn: Boolean,
     selectedCells: Set<Int>,
     filledCell: Cell?,
     selectedWords: List<WordWithCoordinates>,
@@ -1122,6 +1129,7 @@ private fun BottomGameControls(
                 if (phase == GamePhase.SELECT && isCurrentPlayer && !isSubmitted && selectedWords.isEmpty()) {
                     OutlinedButton(
                         onClick = onSkipTurn,
+                        enabled = !isSkippingTurn,
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = MaterialTheme.colorScheme.tertiary
@@ -1139,7 +1147,7 @@ private fun BottomGameControls(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Skip Turn",
+                            text = if (isSkippingTurn) "Skipping..." else "Skip Turn",
                             style = MaterialTheme.typography.bodyLarge.copy(
                                 fontWeight = FontWeight.Medium
                             )
