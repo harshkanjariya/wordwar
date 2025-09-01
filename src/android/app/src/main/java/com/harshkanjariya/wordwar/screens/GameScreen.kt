@@ -29,10 +29,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.filled.Warning
@@ -40,6 +42,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -168,6 +172,8 @@ fun GameScreen(navController: NavController, matchId: String?) {
     var activeGame by remember { mutableStateOf<GameData?>(null) }
     var showPlayerInfo by remember { mutableStateOf(false) }
     var voteEndGamePlayers by remember { mutableStateOf<List<String>>(emptyList()) }
+    var isSubmitting by remember { mutableStateOf(false) } // Add loading state for submit
+    var showMenu by remember { mutableStateOf(false) } // Add state for overflow menu
 
     fun showGamifiedMessage(text: String, type: MessageType, icon: ImageVector? = null) {
         messageText = text
@@ -458,7 +464,58 @@ fun GameScreen(navController: NavController, matchId: String?) {
                             }
                         }
                     },
-                    onPlayerInfoClick = { showPlayerInfo = true }
+                    onPlayerInfoClick = { showPlayerInfo = true },
+                    onSpectate = {
+                        scope.launch {
+                            gameRef.child("players").child(userId).child("status")
+                                .onDisconnect()
+                                .cancel()
+                            val result = GameServiceHolder.api.quitGame()
+                            if (result.status == 200 && result.data != null) {
+                                showGamifiedMessage(
+                                    "You are now spectating! 👀",
+                                    MessageType.INFO,
+                                    Icons.Default.Info
+                                )
+                            }
+                        }
+                    },
+                    onVoteEndGame = {
+                        scope.launch {
+                            try {
+                                val isVoted = voteEndGamePlayers.contains(userId)
+                                if (isVoted) {
+                                    val updatedVotes =
+                                        voteEndGamePlayers.filter { it != userId }
+                                    gameRef.child("voteEndGame").setValue(updatedVotes)
+                                    showGamifiedMessage(
+                                        "Vote removed! 🗳️",
+                                        MessageType.INFO,
+                                        Icons.Default.Info
+                                    )
+                                } else {
+                                    // Add vote
+                                    val updatedVotes = voteEndGamePlayers + userId
+                                    gameRef.child("voteEndGame").setValue(updatedVotes)
+                                    showGamifiedMessage(
+                                        "Vote added! 🗳️",
+                                        MessageType.INFO,
+                                        Icons.Default.Info
+                                    )
+                                }
+                            } catch (e: Exception) {
+                                showGamifiedMessage(
+                                    "Failed to update vote: ${e.message}",
+                                    MessageType.ERROR,
+                                    Icons.Default.Warning
+                                )
+                            }
+                        }
+                    },
+                    voteEndGamePlayers = voteEndGamePlayers,
+                    currentUserId = userId,
+                    showMenu = showMenu,
+                    onShowMenuChange = { showMenu = it }
                 )
 
                 // Scrollable Game Content
@@ -502,10 +559,9 @@ fun GameScreen(navController: NavController, matchId: String?) {
                         phase = phase,
                         isCurrentPlayer = userId == currentPlayer,
                         isSubmitted = isSubmitted,
+                        isSubmitting = isSubmitting,
                         selectedCells = selectedCells,
                         filledCell = filledCell.value,
-                        voteEndGamePlayers = voteEndGamePlayers,
-                        currentUserId = userId,
                         selectedWords = selectedWords,
                         onAddWord = {
                             scope.launch {
@@ -513,47 +569,19 @@ fun GameScreen(navController: NavController, matchId: String?) {
                             }
                         },
                         onRemoveWord = { removeSelectedWord(it) },
-                        onSpectate = {
+                        onSkipTurn = {
                             scope.launch {
-                                gameRef.child("players").child(userId).child("status")
-                                    .onDisconnect()
-                                    .cancel()
-                                val result = GameServiceHolder.api.quitGame()
-                                if (result.status == 200 && result.data != null) {
+                                try {
+                                    val data = hashMapOf("gameId" to matchId)
+                                    functions.getHttpsCallable("skipTurn").call(data).await()
                                     showGamifiedMessage(
-                                        "You are now spectating! 👀",
+                                        "Turn skipped! ⏭️",
                                         MessageType.INFO,
                                         Icons.Default.Info
                                     )
-                                }
-                            }
-                        },
-                        onVoteEndGame = {
-                            scope.launch {
-                                try {
-                                    val isVoted = voteEndGamePlayers.contains(userId)
-                                    if (isVoted) {
-                                        val updatedVotes =
-                                            voteEndGamePlayers.filter { it != userId }
-                                        gameRef.child("voteEndGame").setValue(updatedVotes)
-                                        showGamifiedMessage(
-                                            "Vote removed! 🗳️",
-                                            MessageType.INFO,
-                                            Icons.Default.Info
-                                        )
-                                    } else {
-                                        // Add vote
-                                        val updatedVotes = voteEndGamePlayers + userId
-                                        gameRef.child("voteEndGame").setValue(updatedVotes)
-                                        showGamifiedMessage(
-                                            "Vote added! 🗳️",
-                                            MessageType.INFO,
-                                            Icons.Default.Info
-                                        )
-                                    }
                                 } catch (e: Exception) {
                                     showGamifiedMessage(
-                                        "Failed to update vote: ${e.message}",
+                                        "Failed to skip turn: ${e.message}",
                                         MessageType.ERROR,
                                         Icons.Default.Warning
                                     )
@@ -562,102 +590,109 @@ fun GameScreen(navController: NavController, matchId: String?) {
                         },
                         onSubmit = {
                             scope.launch {
-                                if (phase == GamePhase.EDIT) {
-                                    val character = filledCell.value?.char
-                                    val row = filledCell.value?.index?.div(gridSize)
-                                    val col = filledCell.value?.index?.rem(gridSize)
+                                if (isSubmitting) return@launch // Prevent multiple calls
+                                isSubmitting = true
+                                
+                                try {
+                                    if (phase == GamePhase.EDIT) {
+                                        val character = filledCell.value?.char
+                                        val row = filledCell.value?.index?.div(gridSize)
+                                        val col = filledCell.value?.index?.rem(gridSize)
 
-                                    if (character != null && row != null && col != null) {
-                                        val payload = GameActionPayload(
-                                            character = character,
-                                            row = row,
-                                            col = col,
-                                            claimedWords = emptyList()
-                                        )
-                                        try {
-                                            val response = gameService.submitAction(payload)
-                                            if (response.status != 200) {
-                                                showGamifiedMessage(
-                                                    response.message ?: "Action failed",
-                                                    MessageType.ERROR,
-                                                    Icons.Default.Warning
-                                                )
-                                            } else {
-                                                showGamifiedMessage(
-                                                    "Letter placed successfully! 🎯",
-                                                    MessageType.SUCCESS,
-                                                    Icons.Default.CheckCircle
-                                                )
-                                            }
-                                        } catch (e: Exception) {
-                                            showGamifiedMessage(
-                                                "Failed: ${e.message}",
-                                                MessageType.ERROR,
-                                                Icons.Default.Warning
+                                        if (character != null && row != null && col != null) {
+                                            val payload = GameActionPayload(
+                                                character = character,
+                                                row = row,
+                                                col = col,
+                                                claimedWords = emptyList()
                                             )
-                                        }
-                                    } else {
-                                        showGamifiedMessage(
-                                            "Pick a cell and letter first! 📝",
-                                            MessageType.WARNING,
-                                            Icons.Default.Edit
-                                        )
-                                    }
-
-                                } else if (phase == GamePhase.SELECT) {
-                                    if (selectedWords.isNotEmpty()) {
-                                        val claimedWordPayloads =
-                                            selectedWords.map { wordWithCoords ->
-                                                ClaimedWordPayload(
-                                                    wordWithCoords.word,
-                                                    wordWithCoords.coordinates
-                                                )
-                                            }
-
-                                        val payload = GameActionPayload(
-                                            character = null,
-                                            row = null,
-                                            col = null,
-                                            claimedWords = claimedWordPayloads
-                                        )
-
-                                        try {
-                                            val response = gameService.submitAction(payload)
-                                            if (response.status == 200) {
-                                                isSubmitted = true
-                                                val totalPoints =
-                                                    selectedWords.sumOf { calculateWordPoints(it.word) }
-                                                val wordsList =
-                                                    selectedWords.joinToString(", ") { it.word }
+                                            try {
+                                                val response = gameService.submitAction(payload)
+                                                if (response.status != 200) {
+                                                    showGamifiedMessage(
+                                                        response.message ?: "Action failed",
+                                                        MessageType.ERROR,
+                                                        Icons.Default.Warning
+                                                    )
+                                                } else {
+                                                    showGamifiedMessage(
+                                                        "Letter placed successfully! 🎯",
+                                                        MessageType.SUCCESS,
+                                                        Icons.Default.CheckCircle
+                                                    )
+                                                }
+                                            } catch (e: Exception) {
                                                 showGamifiedMessage(
-                                                    "🎯 You claimed ${selectedWords.size} words: $wordsList (+$totalPoints points total)!",
-                                                    MessageType.SUCCESS,
-                                                    Icons.Default.ThumbUp
-                                                )
-                                                selectedWords =
-                                                    emptyList() // Clear the list after successful submission
-                                            } else {
-                                                showGamifiedMessage(
-                                                    response.message ?: "Action failed",
+                                                    "Failed: ${e.message}",
                                                     MessageType.ERROR,
                                                     Icons.Default.Warning
                                                 )
                                             }
-                                        } catch (e: Exception) {
-                                            Log.e("submitAction", e.toString())
+                                        } else {
                                             showGamifiedMessage(
-                                                "Failed: ${e.message}",
-                                                MessageType.ERROR,
-                                                Icons.Default.Warning
+                                                "Pick a cell and letter first! 📝",
+                                                MessageType.WARNING,
+                                                Icons.Default.Edit
                                             )
                                         }
-                                    } else {
-                                        showGamifiedMessage(
-                                            "Add some words to your list first! 📝",
-                                            MessageType.WARNING,
-                                            Icons.Default.Info
-                                        )
+
+                                    } else if (phase == GamePhase.SELECT) {
+                                        if (selectedWords.isNotEmpty()) {
+                                            val claimedWordPayloads =
+                                                selectedWords.map { wordWithCoords ->
+                                                    ClaimedWordPayload(
+                                                        wordWithCoords.word,
+                                                        wordWithCoords.coordinates
+                                                    )
+                                                }
+
+                                            val payload = GameActionPayload(
+                                                character = null,
+                                                row = null,
+                                                col = null,
+                                                claimedWords = claimedWordPayloads
+                                            )
+
+                                            try {
+                                                val response = gameService.submitAction(payload)
+                                                if (response.status == 200) {
+                                                    isSubmitted = true
+                                                    val totalPoints =
+                                                        selectedWords.sumOf { calculateWordPoints(it.word) }
+                                                    val wordsList =
+                                                        selectedWords.joinToString(", ") { it.word }
+                                                    showGamifiedMessage(
+                                                        "🎯 You claimed ${selectedWords.size} words: $wordsList (+$totalPoints points total)!",
+                                                        MessageType.SUCCESS,
+                                                        Icons.Default.ThumbUp
+                                                    )
+                                                    selectedWords =
+                                                        emptyList() // Clear the list after successful submission
+                                                } else {
+                                                    showGamifiedMessage(
+                                                        response.message ?: "Action failed",
+                                                        MessageType.ERROR,
+                                                        Icons.Default.Warning
+                                                    )
+                                                }
+                                            } catch (e: Exception) {
+                                                Log.e("submitAction", e.toString())
+                                                showGamifiedMessage(
+                                                    "Failed: ${e.message}",
+                                                    MessageType.ERROR,
+                                                    Icons.Default.Warning
+                                                )
+                                            }
+                                        } else {
+                                            showGamifiedMessage(
+                                                "Add some words to your list first! 📝",
+                                                MessageType.WARNING,
+                                                Icons.Default.Info
+                                            )
+                                        }
                                     }
+                                } finally {
+                                    isSubmitting = false // Always reset the loading state
                                 }
                             }
                         }
@@ -733,7 +768,13 @@ private fun TopGameStatusBar(
     currentPlayerId: String,
     activeGame: GameData?,
     onExitClick: () -> Unit,
-    onPlayerInfoClick: () -> Unit
+    onPlayerInfoClick: () -> Unit,
+    onSpectate: () -> Unit,
+    onVoteEndGame: () -> Unit,
+    voteEndGamePlayers: List<String>,
+    currentUserId: String,
+    showMenu: Boolean,
+    onShowMenuChange: (Boolean) -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -802,17 +843,74 @@ private fun TopGameStatusBar(
                 )
             }
 
-            // Player Info Button
-            IconButton(
-                onClick = onPlayerInfoClick,
-                modifier = Modifier.size(48.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = "Player Info",
-                    modifier = Modifier.size(24.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
+            // Overflow Menu Button
+            Box {
+                IconButton(
+                    onClick = { onShowMenuChange(!showMenu) },
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "More Options",
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+                
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { onShowMenuChange(false) }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Players") },
+                        onClick = {
+                            onPlayerInfoClick()
+                            onShowMenuChange(false)
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = "Players"
+                            )
+                        }
+                    )
+                    
+                    DropdownMenuItem(
+                        text = { Text("Spectate") },
+                        onClick = {
+                            onSpectate()
+                            onShowMenuChange(false)
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = "Spectate"
+                            )
+                        }
+                    )
+                    
+                    DropdownMenuItem(
+                        text = { 
+                            Text(
+                                when {
+                                    voteEndGamePlayers.isEmpty() -> "Vote Close"
+                                    voteEndGamePlayers.contains(currentUserId) -> "Remove Vote (${voteEndGamePlayers.size})"
+                                    else -> "Vote Close (${voteEndGamePlayers.size})"
+                                }
+                            ) 
+                        },
+                        onClick = {
+                            onVoteEndGame()
+                            onShowMenuChange(false)
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.ThumbUp,
+                                contentDescription = "Vote"
+                            )
+                        }
+                    )
+                }
             }
         }
 
@@ -857,15 +955,13 @@ private fun BottomGameControls(
     phase: GamePhase,
     isCurrentPlayer: Boolean,
     isSubmitted: Boolean,
+    isSubmitting: Boolean,
     selectedCells: Set<Int>,
     filledCell: Cell?,
-    voteEndGamePlayers: List<String>,
-    currentUserId: String,
     selectedWords: List<WordWithCoordinates>,
     onAddWord: () -> Unit,
     onRemoveWord: (String) -> Unit,
-    onSpectate: () -> Unit,
-    onVoteEndGame: () -> Unit,
+    onSkipTurn: () -> Unit,
     onSubmit: () -> Unit
 ) {
     Card(
@@ -879,7 +975,7 @@ private fun BottomGameControls(
         shape = RoundedCornerShape(20.dp)
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
+            modifier = Modifier.padding(20.dp).fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Game Instructions
@@ -989,84 +1085,13 @@ private fun BottomGameControls(
                     }
                 }
 
-                // Game Control Buttons Row
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    // Spectate Button
-                    OutlinedButton(
-                        onClick = onSpectate,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.secondary
-                        ),
-                        border = BorderStroke(
-                            width = 2.dp,
-                            color = MaterialTheme.colorScheme.secondary
-                        ),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = "Spectate",
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Spectate",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-
-                    // Vote for End Game Button
-                    OutlinedButton(
-                        onClick = onVoteEndGame,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = if (voteEndGamePlayers.contains(currentUserId)) {
-                                MaterialTheme.colorScheme.error
-                            } else {
-                                MaterialTheme.colorScheme.tertiary
-                            }
-                        ),
-                        border = BorderStroke(
-                            width = 2.dp,
-                            color = if (voteEndGamePlayers.contains(currentUserId)) {
-                                MaterialTheme.colorScheme.error
-                            } else {
-                                MaterialTheme.colorScheme.tertiary
-                            }
-                        ),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (voteEndGamePlayers.contains(currentUserId)) {
-                                Icons.Default.ThumbUp
-                            } else {
-                                Icons.Default.ThumbUp
-                            },
-                            contentDescription = "Vote",
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = when {
-                                voteEndGamePlayers.isEmpty() -> "Vote Close"
-                                voteEndGamePlayers.contains(currentUserId) -> "Remove Vote (${voteEndGamePlayers.size})"
-                                else -> "Vote Close (${voteEndGamePlayers.size})"
-                            },
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-
                 // Submit Button (only for current player)
                 if (isCurrentPlayer && !isSubmitted) {
                     Button(
                         onClick = onSubmit,
                         modifier = Modifier.fillMaxWidth(),
                         enabled = when {
+                            isSubmitting -> false // Disable when submitting
                             phase == GamePhase.EDIT -> filledCell != null
                             phase == GamePhase.SELECT -> selectedWords.isNotEmpty()
                             else -> false
@@ -1080,7 +1105,41 @@ private fun BottomGameControls(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Submit",
+                            text = when {
+                                isSubmitting -> "Loading..."
+                                phase == GamePhase.EDIT -> "Save Character"
+                                phase == GamePhase.SELECT -> "Save Words"
+                                else -> "Submit"
+                            },
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
+                    }
+                }
+
+                // Skip Turn Button (only in SELECT phase when no words selected)
+                if (phase == GamePhase.SELECT && isCurrentPlayer && !isSubmitted && selectedWords.isEmpty()) {
+                    OutlinedButton(
+                        onClick = onSkipTurn,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.tertiary
+                        ),
+                        border = BorderStroke(
+                            width = 2.dp,
+                            color = MaterialTheme.colorScheme.tertiary
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowForward,
+                            contentDescription = "Skip Turn",
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Skip Turn",
                             style = MaterialTheme.typography.bodyLarge.copy(
                                 fontWeight = FontWeight.Medium
                             )

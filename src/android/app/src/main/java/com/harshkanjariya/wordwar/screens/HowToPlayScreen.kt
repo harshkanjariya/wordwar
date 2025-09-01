@@ -525,7 +525,10 @@ private fun BottomGameControls(
                         color = MaterialTheme.colorScheme.error
                     )
                 ) {
-                    Text("Back to Menu")
+                    Text(
+                        text = "Back to Menu",
+                        maxLines = 1
+                    )
                 }
 
                 if (isCurrentPlayer && !isSubmitted) {
@@ -538,7 +541,10 @@ private fun BottomGameControls(
                             else -> false
                         }
                     ) {
-                        Text("Submit")
+                        Text(
+                            text = "Submit",
+                            maxLines = 1
+                        )
                     }
                 } else {
                     Spacer(modifier = Modifier.weight(1f))
@@ -693,7 +699,7 @@ private fun TourGuideOverlay(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(32.dp),
+                .padding(16.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surface
             ),
@@ -701,7 +707,7 @@ private fun TourGuideOverlay(
             shape = RoundedCornerShape(24.dp)
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
+                modifier = Modifier.padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
@@ -746,41 +752,53 @@ private fun TourGuideOverlay(
 
                 // Navigation buttons
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     OutlinedButton(
                         onClick = onSkip,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(0.4f),
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        ),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp)
                     ) {
-                        Text("Skip Tour")
+                        Text(
+                            text = "Skip Tour",
+                            maxLines = 1
+                        )
                     }
 
                     if (currentStepIndex > 0) {
                         OutlinedButton(
                             onClick = onPrevious,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(0.4f),
                             colors = ButtonDefaults.outlinedButtonColors(
                                 contentColor = MaterialTheme.colorScheme.primary
-                            )
+                            ),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp)
                         ) {
-                            Text("Previous")
+                            Text(
+                                text = "Previous",
+                                maxLines = 1
+                            )
                         }
                     } else {
-                        Spacer(modifier = Modifier.weight(1f))
+                        Spacer(modifier = Modifier.weight(0.4f))
                     }
 
                     Button(
                         onClick = onNext,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(0.4f),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary
-                        )
+                        ),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp)
                     ) {
-                        Text(if (currentStepIndex == totalSteps - 1) "Finish" else "Next")
+                        Text(
+                            text = if (currentStepIndex == totalSteps - 1) "Finish" else "Next",
+                            maxLines = 1
+                        )
                     }
                 }
             }
