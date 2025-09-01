@@ -107,7 +107,7 @@ export async function validateWord(word: string) {
  */
 export function validateWordNotClaimed(word: string, dbGame: any) {
   const claimed = dbGame.claimedWords || {};
-  const allWords = Object.values(claimed).flat();
+  const allWords = Object.values(claimed).flat().map((w: any) => w.toLowerCase());
   
   // Generate word variations to check for singular/plural conflicts
   const wordVariations = generateWordVariations(word);
