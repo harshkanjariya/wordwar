@@ -455,10 +455,22 @@ fun GameScreen(navController: NavController, matchId: String?) {
                     activeGame = activeGame,
                     onExitClick = {
                         scope.launch {
-                            gameRef.child("players").child(userId).child("status").onDisconnect()
-                                .cancel()
-                            val result = GameServiceHolder.api.quitGame()
-                            if (result.status == 200 && result.data != null) {
+                            try {
+                                gameRef.child("players").child(userId).child("status").onDisconnect()
+                                    .cancel()
+                                val result = GameServiceHolder.api.quitGame()
+                                if (result.status == 200 && result.data != null) {
+                                    navController.navigate("menu") {
+                                        popUpTo(navController.graph.id) { inclusive = true }
+                                    }
+                                } else {
+                                    // Handle error - navigate to menu anyway
+                                    navController.navigate("menu") {
+                                        popUpTo(navController.graph.id) { inclusive = true }
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                // Handle exception - navigate to menu anyway
                                 navController.navigate("menu") {
                                     popUpTo(navController.graph.id) { inclusive = true }
                                 }
@@ -468,11 +480,27 @@ fun GameScreen(navController: NavController, matchId: String?) {
                     onPlayerInfoClick = { showPlayerInfo = true },
                     onSpectate = {
                         scope.launch {
-                            gameRef.child("players").child(userId).child("status")
-                                .onDisconnect()
-                                .cancel()
-                            val result = GameServiceHolder.api.quitGame()
-                            if (result.status == 200 && result.data != null) {
+                            try {
+                                gameRef.child("players").child(userId).child("status")
+                                    .onDisconnect()
+                                    .cancel()
+                                val result = GameServiceHolder.api.quitGame()
+                                if (result.status == 200 && result.data != null) {
+                                    showGamifiedMessage(
+                                        "You are now spectating! 👀",
+                                        MessageType.INFO,
+                                        Icons.Default.Info
+                                    )
+                                } else {
+                                    // Handle error - still show spectating message
+                                    showGamifiedMessage(
+                                        "You are now spectating! 👀",
+                                        MessageType.INFO,
+                                        Icons.Default.Info
+                                    )
+                                }
+                            } catch (e: Exception) {
+                                // Handle exception - still show spectating message
                                 showGamifiedMessage(
                                     "You are now spectating! 👀",
                                     MessageType.INFO,

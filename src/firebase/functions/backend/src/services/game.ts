@@ -11,7 +11,9 @@ import {
   buildWordFromCells,
   validateCellsFilled,
   validateEmptyCell,
-  validateLinearSelection, validateWord, validateWordNotClaimed
+  validateLinearSelection,
+  validateWord,
+  validateWordNotClaimed
 } from "../utils/game_action_validation";
 
 export async function createLiveGame(body: any) {
@@ -202,69 +204,96 @@ export async function getCurrentGameInfo(user: FullDocument<User>) {
     throw new ApiError("User not found", 401);
   }
 
-  let currentGameId = userData?.currentGameId ?? null;
-  let liveGameData: any = null;
+  // Step 1: Fetch Firebase and DB entries in parallel with proper filtering
+  const [firebaseGamesSnapshot, dbGames] = await Promise.all([
+    // Firebase: Get all games and filter in memory (Firebase doesn't support $ne queries easily)
+    (async () => {
+      return await firebaseDatabase.ref("live_games").once("value");
+    })(),
+    // MongoDB: Query with nested field filter for non-QUIT status
+    (async () => {
+      return await repositories.live_games.findAll({
+        filter: {
+          [`players.${user._id}.status`]: {$ne: "QUIT"}
+        }
+      });
+    })()
+  ]);
+  
+  const allFirebaseGames = firebaseGamesSnapshot.val() || {};
 
-  if (!currentGameId) {
-    const gamesSnapshot = await firebaseDatabase.ref("live_games").once("value");
-    const allGames = gamesSnapshot.val() || {};
+  // Filter Firebase games where player exists and status is not QUIT
+  const firebaseUserGames = Object.entries(allFirebaseGames)
+    .filter(([gameId, game]: [string, any]) => {
+      const playerData = game?.players?.[user._id.toString()];
+      return playerData && playerData.status !== "QUIT";
+    })
+    .map(([gameId, game]: [string, any]) => ({
+      gameId,
+      gameData: game,
+      createdAt: game.createdAt || 0
+    }));
 
-    for (const [gameId, game] of Object.entries<any>(allGames)) {
-      if (game?.players?.includes?.(user._id.toString())) {
-        currentGameId = ObjectId.createFromHexString(gameId);
-        liveGameData = game;
-        break;
-      }
-    }
+  // DB games are already filtered by the query, just map them
+  const dbUserGames = dbGames.map((game: any) => ({
+    gameId: game._id.toString(),
+    gameData: game,
+    createdAt: game.createdAt || 0
+  }));
 
-    if (!currentGameId) {
-      return {
-        currentGameId: null,
-        gameData: null,
-      };
-    }
+  // Step 4: Handle different scenarios
+  const firebaseGameIds = new Set(firebaseUserGames.map(g => g.gameId));
+  const dbGameIds = new Set(dbUserGames.map(g => g.gameId));
+
+  // Entries in DB but not in Firebase - move to game history
+  const dbOnlyGames = dbUserGames.filter(g => !firebaseGameIds.has(g.gameId));
+
+  for (const game of dbOnlyGames) {
+    await moveGameToHistory(game.gameId, game.gameData);
   }
 
-  try {
-    const dbGameData = await repositories.live_games.findOne({ filter: { _id: userData.currentGameId } });
-    if (!dbGameData && !liveGameData) {
-      return {
-        currentGameId: userData.currentGameId,
-        gameData: null,
-      };
+  // Entries in Firebase but not in DB - delete from Firebase
+  const firebaseOnlyGames = firebaseUserGames.filter(g => !dbGameIds.has(g.gameId));
+
+  for (const game of firebaseOnlyGames) {
+    await firebaseDatabase.ref(`live_games/${game.gameId}`).remove();
+  }
+  
+  // Step 5: Handle common games (in both Firebase and DB)
+  const commonGames = firebaseUserGames.filter(g => dbGameIds.has(g.gameId));
+
+  if (commonGames.length === 0) {
+    // No active games found
+    return {
+      currentGameId: null,
+      gameData: null,
+    };
+  } else if (commonGames.length === 1) {
+    // Single active game - update user profile and return
+    const game = commonGames[0];
+    
+    await repositories.users.updateRaw(
+      { _id: user._id },
+      { $set: { currentGameId: ObjectId.createFromHexString(game.gameId) } }
+    );
+    return await getGameDataForResponse(game.gameId, game.gameData);
+  } else {
+    // Multiple active games - keep most recent, set others to QUIT
+    const sortedGames = commonGames.sort((a, b) => b.createdAt - a.createdAt);
+    const mostRecentGame = sortedGames[0];
+    const gamesToQuit = sortedGames.slice(1);
+
+    await repositories.users.updateRaw(
+      { _id: user._id },
+      { $set: { currentGameId: ObjectId.createFromHexString(mostRecentGame.gameId) } }
+    );
+    // Set other games to QUIT status
+    for (const game of gamesToQuit) {
+      const quitStartTime = Date.now();
+      await setGameToQuitStatus(game.gameId, user._id.toString());
     }
 
-    const mergedGame = {
-      ...dbGameData,
-      ...liveGameData,
-    };
-
-    const players = await repositories.users.findAll({
-      filter: { _id: { $in: mergedGame.players.map((p: string) => ObjectId.createFromHexString(p)) } },
-    });
-
-    const playersFormatted = mergedGame.players.map((playerId: string) => {
-      const player = players.find((u: any) => u._id.toString() === playerId.toString());
-      return {
-        _id: playerId,
-        name: player?.name ?? "Unknown",
-        joinedAt: mergedGame.joinedAt?.[playerId] ?? null,
-        claimedWords: mergedGame.claimedWords?.[playerId] ?? [],
-      };
-    });
-
-    return {
-      currentGameId: userData.currentGameId,
-      gameData: {
-        createdAt: mergedGame.createdAt,
-        updatedAt: mergedGame.updatedAt,
-        cellData: mergedGame.cellData,
-        players: playersFormatted,
-      },
-    };
-  } catch (error) {
-    console.error(`Failed to fetch game data for ${userData.currentGameId}:`, error);
-    throw new ApiError("Failed to fetch live game data.", 500);
+    return await getGameDataForResponse(mostRecentGame.gameId, mostRecentGame.gameData);
   }
 }
 
@@ -298,23 +327,119 @@ export async function getGameInfo(user: FullDocument<User>, gameId: string) {
 
 export async function quitGame(user: FullDocument<User>) {
   const userData = await repositories.users.findOne({filter: {_id: user._id}});
-  if (!userData?.currentGameId) {
-    throw new ApiError("You're not in any active game!", 400);
+  
+  // If user has currentGameId, use the existing logic
+  if (userData?.currentGameId) {
+    const gameRef = firebaseDatabase.ref(`live_games/${userData.currentGameId}`);
+
+    // Update user's currentGameId to null
+    await repositories.users.updateRaw({
+      _id: user._id,
+    }, {
+      $unset: {
+        currentGameId: true,
+      }
+    });
+
+    // Set player status to "QUIT" in Firebase
+    await gameRef.child(`players/${user._id}/status`).set("QUIT");
+
+    // Also update the live_games repository to keep it in sync
+    try {
+      await repositories.live_games.updateRaw(
+        { _id: userData.currentGameId },
+        { 
+          $set: { 
+            [`players.${user._id}.status`]: "QUIT",
+            updatedAt: Date.now()
+          } 
+        }
+      );
+    } catch (error) {
+      console.error(`Failed to update live_games repository for user ${user._id} quit:`, error);
+      // Don't throw error here as Firebase update succeeded
+    }
+
+    return true;
   }
 
-  const gameRef = firebaseDatabase.ref(`live_games/${userData.currentGameId}`);
+  // Just ensure user's currentGameId is null (in case it wasn't properly cleared)
+  await repositories.users.updateRaw(
+    { _id: user._id },
+    { $unset: { currentGameId: true } }
+  );
 
-  await repositories.users.updateRaw({
-    _id: user._id,
-  }, {
-    $unset: {
-      currentGameId: true,
-    }
-  });
-
-  await gameRef.child("players/" + user._id + "/status").set("quit");
+  // Trigger background cleanup without waiting for it (non-blocking)
+  cleanupOrphanedEntries(user._id.toString()).catch(error => 
+    console.error(`Background cleanup failed for user ${user._id}:`, error)
+  );
 
   return true;
+}
+
+// Background cleanup function for orphaned entries (non-blocking)
+export async function cleanupOrphanedEntries(userId: string) {
+  try {
+    const [firebaseGamesSnapshot, dbGames] = await Promise.all([
+      firebaseDatabase.ref("live_games").once("value"),
+      repositories.live_games.findAll({
+        filter: { 
+          [`players.${userId}.status`]: { $ne: "QUIT" }
+        }
+      })
+    ]);
+
+    const allFirebaseGames = firebaseGamesSnapshot.val() || {};
+    
+    // Find Firebase games where user exists and status is not QUIT
+    const firebaseUserGames = Object.entries(allFirebaseGames)
+      .filter(([gameId, game]: [string, any]) => {
+        const playerData = game?.players?.[userId];
+        return playerData && playerData.status !== "QUIT";
+      })
+      .map(([gameId, game]: [string, any]) => ({
+        gameId,
+        gameData: game
+      }));
+
+    // Find DB games where user exists and status is not QUIT
+    const dbUserGames = dbGames.map((game: any) => ({
+      gameId: game._id.toString(),
+      gameData: game
+    }));
+
+    // Set all orphaned entries to QUIT status (non-blocking)
+    const promises = [];
+
+    // Set Firebase orphaned entries to QUIT
+    for (const game of firebaseUserGames) {
+      const gameRef = firebaseDatabase.ref(`live_games/${game.gameId}`);
+      promises.push(
+        gameRef.child(`players/${userId}/status`).set("QUIT")
+          .catch(error => console.error(`Failed to set Firebase game ${game.gameId} to QUIT:`, error))
+      );
+    }
+
+    // Set DB orphaned entries to QUIT
+    for (const game of dbUserGames) {
+      promises.push(
+        repositories.live_games.updateRaw(
+          { _id: ObjectId.createFromHexString(game.gameId) },
+          { 
+            $set: { 
+              [`players.${userId}.status`]: "QUIT",
+              updatedAt: Date.now()
+            } 
+          }
+        ).catch(error => console.error(`Failed to set DB game ${game.gameId} to QUIT:`, error))
+      );
+    }
+
+    // Wait for all updates to complete
+    await Promise.all(promises);
+  } catch (error) {
+    console.error(`Background cleanup failed for user ${userId}:`, error);
+  }
 }
 
 export async function endGame(gameId: string) {
@@ -380,5 +505,108 @@ export async function endGame(gameId: string) {
     throw error;
   } finally {
     await session.endSession();
+  }
+}
+
+// Helper function to move a game to history (based on endGame logic)
+async function moveGameToHistory(gameId: string, gameData: any) {
+  const session = await repositories.startTransaction();
+  
+  try {
+    const leftAt: Record<string, number> = {};
+    Object.keys(gameData.players || {}).forEach((playerId) => {
+      leftAt[playerId] = Date.now();
+    });
+
+    const gameHistoryPayload: GameHistory = {
+      // @ts-ignore
+      _id: ObjectId.createFromHexString(gameId),
+      players: Object.keys(gameData.players || {}),
+      joinedAt: gameData.joinedAt || {},
+      leftAt: leftAt,
+      startedAt: gameData.createdAt || Date.now(),
+      endedAt: Date.now(),
+      cellData: gameData.cellData || [],
+      claimedWords: gameData.claimedWords || {},
+    };
+
+    await repositories.game_history.updateOne(
+      { filter: { _id: ObjectId.createFromHexString(gameId) } },
+      gameHistoryPayload,
+      { upsert: true, session }
+    );
+
+    await repositories.users.updateRaw(
+      { _id: { $in: Object.keys(gameData.players || {}).map((p) => ObjectId.createFromHexString(p)) } },
+      { $unset: { currentGameId: true } },
+      { session }
+    );
+
+    await repositories.live_games.deleteOne(
+      { _id: ObjectId.createFromHexString(gameId) },
+      { session }
+    );
+
+    await session.commitTransaction();
+  } catch (error) {
+    await session.abortTransaction();
+    console.error(`Failed to move game ${gameId} to history:`, error);
+    throw error;
+  } finally {
+    await session.endSession();
+  }
+}
+
+// Helper function to set a game to QUIT status in both Firebase and DB
+async function setGameToQuitStatus(gameId: string, userId: string) {
+  try {
+    // Update Firebase
+    const gameRef = firebaseDatabase.ref(`live_games/${gameId}`);
+    await gameRef.child(`players/${userId}/status`).set("QUIT");
+
+    // Update DB
+    await repositories.live_games.updateRaw(
+      { _id: ObjectId.createFromHexString(gameId) },
+      { 
+        $set: { 
+          [`players.${userId}.status`]: "QUIT",
+          updatedAt: Date.now()
+        } 
+      }
+    );
+  } catch (error) {
+    console.error(`Failed to set game ${gameId} to QUIT status for user ${userId}:`, error);
+    throw error;
+  }
+}
+
+// Helper function to get formatted game data for response
+async function getGameDataForResponse(gameId: string, gameData: any) {
+  try {
+    const players = await repositories.users.findAll({
+      filter: { _id: { $in: Object.keys(gameData.players || {}).map((p: string) => ObjectId.createFromHexString(p)) } },
+    });
+    const playersFormatted = Object.keys(gameData.players || {}).map((playerId: string) => {
+      const player = players.find((u: any) => u._id.toString() === playerId.toString());
+      return {
+        _id: playerId,
+        name: player?.name ?? "Unknown",
+        joinedAt: gameData.joinedAt?.[playerId] ?? null,
+        claimedWords: gameData.claimedWords?.[playerId] ?? [],
+      };
+    });
+    const result = {
+      currentGameId: gameId,
+      gameData: {
+        createdAt: gameData.createdAt,
+        updatedAt: gameData.updatedAt,
+        cellData: gameData.cellData,
+        players: playersFormatted,
+      },
+    };
+    return result;
+  } catch (error) {
+    console.error(`Failed to format game data for ${gameId}:`, error);
+    throw new ApiError("Failed to fetch live game data.", 500);
   }
 }

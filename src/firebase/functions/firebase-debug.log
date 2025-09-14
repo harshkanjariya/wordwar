@@ -1,0 +1,310 @@
+[debug] [2025-09-14T10:45:45.136Z] ----------------------------------------------------------------------
+[debug] [2025-09-14T10:45:45.137Z] Command:       /usr/local/bin/node /usr/local/bin/firebase deploy --only functions:api
+[debug] [2025-09-14T10:45:45.137Z] CLI Version:   14.9.0
+[debug] [2025-09-14T10:45:45.137Z] Platform:      linux
+[debug] [2025-09-14T10:45:45.137Z] Node Version:  v22.14.0
+[debug] [2025-09-14T10:45:45.137Z] Time:          Sun Sep 14 2025 16:15:45 GMT+0530 (India Standard Time)
+[debug] [2025-09-14T10:45:45.137Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-09-14T10:45:45.138Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
+[debug] [2025-09-14T10:45:45.232Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-09-14T10:45:45.232Z] > authorizing via signed-in user (games.minispirit1@gmail.com)
+[debug] [2025-09-14T10:45:45.232Z] [iam] checking project word-war-4 for permissions ["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]
+[debug] [2025-09-14T10:45:45.232Z] Checked if tokens are valid: false, expires at: 1756803794483
+[debug] [2025-09-14T10:45:45.232Z] Checked if tokens are valid: false, expires at: 1756803794483
+[debug] [2025-09-14T10:45:45.235Z] > refreshing access token with scopes: []
+[debug] [2025-09-14T10:45:45.236Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-09-14T10:45:45.236Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-09-14T10:45:45.498Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-09-14T10:45:45.498Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-09-14T10:45:45.501Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/word-war-4:testIamPermissions [none]
+[debug] [2025-09-14T10:45:45.501Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/word-war-4:testIamPermissions x-goog-quota-user=projects/word-war-4
+[debug] [2025-09-14T10:45:45.501Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/word-war-4:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2025-09-14T10:45:45.865Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200
+[debug] [2025-09-14T10:45:45.865Z] <<< [apiv2][body] GET https://firebase-public.firebaseio.com/cli.json {"cloudBuildErrorAfter":1594252800000,"cloudBuildWarnAfter":1590019200000,"defaultNode10After":1594252800000,"minVersion":"3.0.5","node8DeploysDisabledAfter":1613390400000,"node8RuntimeDisabledAfter":1615809600000,"node8WarnAfter":1600128000000}
+[debug] [2025-09-14T10:45:46.986Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/word-war-4:testIamPermissions 200
+[debug] [2025-09-14T10:45:46.986Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/word-war-4:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2025-09-14T10:45:46.986Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:45:46.987Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:45:46.987Z] >>> [apiv2][query] POST https://iam.googleapis.com/v1/projects/word-war-4/serviceAccounts/word-war-4@appspot.gserviceaccount.com:testIamPermissions [none]
+[debug] [2025-09-14T10:45:46.987Z] >>> [apiv2][body] POST https://iam.googleapis.com/v1/projects/word-war-4/serviceAccounts/word-war-4@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[debug] [2025-09-14T10:45:48.822Z] <<< [apiv2][status] POST https://iam.googleapis.com/v1/projects/word-war-4/serviceAccounts/word-war-4@appspot.gserviceaccount.com:testIamPermissions 200
+[debug] [2025-09-14T10:45:48.822Z] <<< [apiv2][body] POST https://iam.googleapis.com/v1/projects/word-war-4/serviceAccounts/word-war-4@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[info] 
+[info] === Deploying to 'word-war-4'...
+[info] 
+[info] i  deploying functions 
+[info] Running command: npm --prefix "$RESOURCE_DIR" run build
+[info] ✔  functions: Finished running predeploy script. 
+[debug] [2025-09-14T10:45:54.321Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:45:54.321Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:45:54.321Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/word-war-4 [none]
+[debug] [2025-09-14T10:45:55.923Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/word-war-4 200
+[debug] [2025-09-14T10:45:55.923Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/word-war-4 {"projectNumber":"535433341383","projectId":"word-war-4","lifecycleState":"ACTIVE","name":"WordWar","labels":{"firebase":"enabled","firebase-core":"disabled"},"createTime":"2025-08-22T12:27:42.605240Z"}
+[info] i  functions: preparing codebase api for deployment 
+[info] i  functions: ensuring required API cloudfunctions.googleapis.com is enabled... 
+[info] i  functions: ensuring required API cloudbuild.googleapis.com is enabled... 
+[info] i  artifactregistry: ensuring required API artifactregistry.googleapis.com is enabled... 
+[debug] [2025-09-14T10:45:55.926Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:45:55.926Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:45:55.927Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/word-war-4/adminSdkConfig [none]
+[debug] [2025-09-14T10:45:56.386Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/word-war-4/adminSdkConfig 200
+[debug] [2025-09-14T10:45:56.386Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/word-war-4/adminSdkConfig {"projectId":"word-war-4","databaseURL":"https://word-war-4-default-rtdb.asia-southeast1.firebasedatabase.app","storageBucket":"word-war-4.firebasestorage.app"}
+[debug] [2025-09-14T10:45:56.387Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:45:56.387Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:45:56.387Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/word-war-4/configs [none]
+[debug] [2025-09-14T10:45:56.947Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/word-war-4/configs 200
+[debug] [2025-09-14T10:45:56.947Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/word-war-4/configs {"configs":[{"name":"projects/word-war-4/configs/api"}]}
+[debug] [2025-09-14T10:45:56.948Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:45:56.948Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:45:56.948Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/word-war-4/configs/api/variables [none]
+[debug] [2025-09-14T10:45:57.277Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/word-war-4/configs/api/variables 200
+[debug] [2025-09-14T10:45:57.277Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/word-war-4/configs/api/variables {"variables":[{"name":"projects/word-war-4/configs/api/variables/key","updateTime":"2025-08-24T16:48:16.926281430Z"},{"name":"projects/word-war-4/configs/api/variables/url","updateTime":"2025-08-24T16:48:16.846780226Z"}]}
+[debug] [2025-09-14T10:45:57.277Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:45:57.277Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:45:57.278Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:45:57.278Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:45:57.278Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/word-war-4/configs/api/variables/key [none]
+[debug] [2025-09-14T10:45:57.279Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/word-war-4/configs/api/variables/url [none]
+[debug] [2025-09-14T10:45:57.685Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/word-war-4/configs/api/variables/key 200
+[debug] [2025-09-14T10:45:57.685Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/word-war-4/configs/api/variables/key {"name":"projects/word-war-4/configs/api/variables/key","updateTime":"2025-08-24T16:48:16.926281430Z","text":"5cdf2476-491a-4cc5-8ff2-ecd8767a7e23"}
+[debug] [2025-09-14T10:45:57.799Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/word-war-4/configs/api/variables/url 200
+[debug] [2025-09-14T10:45:57.799Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/word-war-4/configs/api/variables/url {"name":"projects/word-war-4/configs/api/variables/url","updateTime":"2025-08-24T16:48:16.846780226Z","text":"https://word-war-4.web.app/api"}
+[debug] [2025-09-14T10:45:57.801Z] Validating nodejs source
+[debug] [2025-09-14T10:45:58.222Z] > [functions] package.json contents: {
+  "main": "dist/main.js",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.709.0",
+    "@aws-sdk/client-ses": "^3.714.0",
+    "@fastify/aws-lambda": "^5.1.4",
+    "@fastify/jwt": "^9.0.1",
+    "@fastify/multipart": "^9.0.1",
+    "@fastify/redis": "^7.0.1",
+    "@fastify/static": "^8.0.3",
+    "@types/ejs": "^3.1.5",
+    "@types/jsonwebtoken": "^9.0.7",
+    "axios": "^1.7.8",
+    "bcryptjs": "^3.0.2",
+    "cashfree-pg": "^4.3.10",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
+    "cors": "^2.8.5",
+    "crypto": "^1.0.1",
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "fastify": "^5.1.0",
+    "fastify-multipart": "^5.3.1",
+    "fastify-static": "^4.6.1",
+    "firebase-admin": "^13.0.2",
+    "firebase-functions": "^6.4.0",
+    "ioredis": "^5.4.1",
+    "jsonwebtoken": "^9.0.2",
+    "module-alias": "^2.2.3",
+    "moment": "^2.30.1",
+    "mongodb": "^6.10.0",
+    "nodemailer": "^6.9.16",
+    "qs": "^6.13.1",
+    "reflect-metadata": "^0.2.2",
+    "tsconfig-paths": "^4.2.0",
+    "uuid": "^11.0.3"
+  },
+  "scripts": {
+    "start": "node dist/index.js",
+    "dev": "NODE_ENV=local nodemon src/index.ts",
+    "vercel": "VERCEL=true vercel dev",
+    "build": "webpack --config webpack.config.js && npm run copy-assets",
+    "copy-assets": "copyfiles 'src/notifications/**/*' 'src/bootstrap/wordwar-firebase-adminsdk.json' dist/",
+    "prepare:functions": "npm run build",
+    "serve": "npm run prepare:functions && (firebase emulators:start --only functions)",
+    "deploy:staging": "npm run prepare:functions && (firebase deploy --only functions -P staging)",
+    "deploy:prod": "NODE_ENV=production npm run prepare:functions && (firebase deploy --only functions -P production)"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.15.0",
+    "@types/node": "^22.13.1",
+    "@types/nodemailer": "^6.4.17",
+    "@types/qs": "^6.9.17",
+    "@typescript-eslint/eslint-plugin": "^8.15.0",
+    "@typescript-eslint/parser": "^8.15.0",
+    "bcrypt": "^6.0.0",
+    "copy-webpack-plugin": "^13.0.0",
+    "copyfiles": "^2.4.1",
+    "eslint": "^9.15.0",
+    "globals": "^15.12.0",
+    "pino-pretty": "^13.0.0",
+    "serverless-domain-manager": "^8.0.0",
+    "serverless-offline": "^14.4.0",
+    "serverless-prune-plugin": "^2.1.0",
+    "ts-loader": "^9.5.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.15.0",
+    "webpack": "^5.98.0",
+    "webpack-cli": "^6.0.1",
+    "webpack-node-externals": "^3.0.0"
+  }
+}
+[debug] [2025-09-14T10:45:58.222Z] Building nodejs source
+[info] i  functions: Loading and analyzing source code for codebase api to determine what to deploy 
+[debug] [2025-09-14T10:45:58.223Z] Could not find functions.yaml. Must use http discovery
+[debug] [2025-09-14T10:45:58.226Z] Found firebase-functions binary at '/home/harsh/Documents/wordwar/src/firebase/functions/backend/node_modules/.bin/firebase-functions'
+[info] Serving at port 8960
+
+[info] Connecting to MongoDB at mongodb+srv://gamesminispirit1:L2LHXroEX5ctYsp8@wordwar.jnoepfj.mongodb.net/wordwar
+
+[debug] [2025-09-14T10:45:58.599Z] Got response from /__/functions.yaml {"endpoints":{"api":{"availableMemoryMb":512,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["asia-south1"],"labels":{},"httpsTrigger":{},"entryPoint":"api"}},"specVersion":"v1alpha1","requiredAPIs":[],"extensions":{}}
+[info] Redis connected
+
+[info] MongoDB connected to database: wordwar
+
+[debug] [2025-09-14T10:52:18.752Z] ----------------------------------------------------------------------
+[debug] [2025-09-14T10:52:18.753Z] Command:       /usr/local/bin/node /usr/local/bin/firebase deploy --only functions:api
+[debug] [2025-09-14T10:52:18.753Z] CLI Version:   14.9.0
+[debug] [2025-09-14T10:52:18.754Z] Platform:      linux
+[debug] [2025-09-14T10:52:18.754Z] Node Version:  v22.14.0
+[debug] [2025-09-14T10:52:18.754Z] Time:          Sun Sep 14 2025 16:22:18 GMT+0530 (India Standard Time)
+[debug] [2025-09-14T10:52:18.754Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-09-14T10:52:18.842Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-09-14T10:52:18.842Z] > authorizing via signed-in user (games.minispirit1@gmail.com)
+[debug] [2025-09-14T10:52:18.842Z] [iam] checking project word-war-4 for permissions ["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]
+[debug] [2025-09-14T10:52:18.843Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:52:18.843Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:52:18.843Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/word-war-4:testIamPermissions [none]
+[debug] [2025-09-14T10:52:18.843Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/word-war-4:testIamPermissions x-goog-quota-user=projects/word-war-4
+[debug] [2025-09-14T10:52:18.843Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/word-war-4:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2025-09-14T10:52:20.373Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/word-war-4:testIamPermissions 200
+[debug] [2025-09-14T10:52:20.373Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/word-war-4:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2025-09-14T10:52:20.374Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:52:20.374Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:52:20.374Z] >>> [apiv2][query] POST https://iam.googleapis.com/v1/projects/word-war-4/serviceAccounts/word-war-4@appspot.gserviceaccount.com:testIamPermissions [none]
+[debug] [2025-09-14T10:52:20.374Z] >>> [apiv2][body] POST https://iam.googleapis.com/v1/projects/word-war-4/serviceAccounts/word-war-4@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[debug] [2025-09-14T10:52:22.216Z] <<< [apiv2][status] POST https://iam.googleapis.com/v1/projects/word-war-4/serviceAccounts/word-war-4@appspot.gserviceaccount.com:testIamPermissions 200
+[debug] [2025-09-14T10:52:22.216Z] <<< [apiv2][body] POST https://iam.googleapis.com/v1/projects/word-war-4/serviceAccounts/word-war-4@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[info] 
+[info] === Deploying to 'word-war-4'...
+[info] 
+[info] i  deploying functions 
+[info] Running command: npm --prefix "$RESOURCE_DIR" run build
+[info] ✔  functions: Finished running predeploy script. 
+[debug] [2025-09-14T10:52:26.670Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:52:26.670Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:52:26.670Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/word-war-4 [none]
+[debug] [2025-09-14T10:52:28.255Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/word-war-4 200
+[debug] [2025-09-14T10:52:28.255Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/word-war-4 {"projectNumber":"535433341383","projectId":"word-war-4","lifecycleState":"ACTIVE","name":"WordWar","labels":{"firebase":"enabled","firebase-core":"disabled"},"createTime":"2025-08-22T12:27:42.605240Z"}
+[info] i  functions: preparing codebase api for deployment 
+[info] i  functions: ensuring required API cloudfunctions.googleapis.com is enabled... 
+[info] i  functions: ensuring required API cloudbuild.googleapis.com is enabled... 
+[info] i  artifactregistry: ensuring required API artifactregistry.googleapis.com is enabled... 
+[debug] [2025-09-14T10:52:28.260Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:52:28.260Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:52:28.260Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/word-war-4/adminSdkConfig [none]
+[debug] [2025-09-14T10:52:28.765Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/word-war-4/adminSdkConfig 200
+[debug] [2025-09-14T10:52:28.765Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/word-war-4/adminSdkConfig {"projectId":"word-war-4","databaseURL":"https://word-war-4-default-rtdb.asia-southeast1.firebasedatabase.app","storageBucket":"word-war-4.firebasestorage.app"}
+[debug] [2025-09-14T10:52:28.766Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:52:28.766Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:52:28.767Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/word-war-4/configs [none]
+[debug] [2025-09-14T10:52:29.276Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/word-war-4/configs 200
+[debug] [2025-09-14T10:52:29.276Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/word-war-4/configs {"configs":[{"name":"projects/word-war-4/configs/api"}]}
+[debug] [2025-09-14T10:52:29.277Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:52:29.277Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:52:29.277Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/word-war-4/configs/api/variables [none]
+[debug] [2025-09-14T10:52:29.687Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/word-war-4/configs/api/variables 200
+[debug] [2025-09-14T10:52:29.688Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/word-war-4/configs/api/variables {"variables":[{"name":"projects/word-war-4/configs/api/variables/key","updateTime":"2025-08-24T16:48:16.926281430Z"},{"name":"projects/word-war-4/configs/api/variables/url","updateTime":"2025-08-24T16:48:16.846780226Z"}]}
+[debug] [2025-09-14T10:52:29.688Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:52:29.688Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:52:29.689Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:52:29.689Z] Checked if tokens are valid: true, expires at: 1757850344498
+[debug] [2025-09-14T10:52:29.689Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/word-war-4/configs/api/variables/key [none]
+[debug] [2025-09-14T10:52:29.690Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/word-war-4/configs/api/variables/url [none]
+[debug] [2025-09-14T10:52:30.096Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/word-war-4/configs/api/variables/key 200
+[debug] [2025-09-14T10:52:30.096Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/word-war-4/configs/api/variables/key {"name":"projects/word-war-4/configs/api/variables/key","updateTime":"2025-08-24T16:48:16.926281430Z","text":"5cdf2476-491a-4cc5-8ff2-ecd8767a7e23"}
+[debug] [2025-09-14T10:52:30.144Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/word-war-4/configs/api/variables/url 200
+[debug] [2025-09-14T10:52:30.144Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/word-war-4/configs/api/variables/url {"name":"projects/word-war-4/configs/api/variables/url","updateTime":"2025-08-24T16:48:16.846780226Z","text":"https://word-war-4.web.app/api"}
+[debug] [2025-09-14T10:52:30.146Z] Validating nodejs source
+[debug] [2025-09-14T10:52:30.540Z] > [functions] package.json contents: {
+  "main": "dist/main.js",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.709.0",
+    "@aws-sdk/client-ses": "^3.714.0",
+    "@fastify/aws-lambda": "^5.1.4",
+    "@fastify/jwt": "^9.0.1",
+    "@fastify/multipart": "^9.0.1",
+    "@fastify/redis": "^7.0.1",
+    "@fastify/static": "^8.0.3",
+    "@types/ejs": "^3.1.5",
+    "@types/jsonwebtoken": "^9.0.7",
+    "axios": "^1.7.8",
+    "bcryptjs": "^3.0.2",
+    "cashfree-pg": "^4.3.10",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
+    "cors": "^2.8.5",
+    "crypto": "^1.0.1",
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "fastify": "^5.1.0",
+    "fastify-multipart": "^5.3.1",
+    "fastify-static": "^4.6.1",
+    "firebase-admin": "^13.0.2",
+    "firebase-functions": "^6.4.0",
+    "ioredis": "^5.4.1",
+    "jsonwebtoken": "^9.0.2",
+    "module-alias": "^2.2.3",
+    "moment": "^2.30.1",
+    "mongodb": "^6.10.0",
+    "nodemailer": "^6.9.16",
+    "qs": "^6.13.1",
+    "reflect-metadata": "^0.2.2",
+    "tsconfig-paths": "^4.2.0",
+    "uuid": "^11.0.3"
+  },
+  "scripts": {
+    "start": "node dist/index.js",
+    "dev": "NODE_ENV=local nodemon src/index.ts",
+    "vercel": "VERCEL=true vercel dev",
+    "build": "webpack --config webpack.config.js && npm run copy-assets",
+    "copy-assets": "copyfiles 'src/notifications/**/*' 'src/bootstrap/wordwar-firebase-adminsdk.json' dist/",
+    "prepare:functions": "npm run build",
+    "serve": "npm run prepare:functions && (firebase emulators:start --only functions)",
+    "deploy:staging": "npm run prepare:functions && (firebase deploy --only functions -P staging)",
+    "deploy:prod": "NODE_ENV=production npm run prepare:functions && (firebase deploy --only functions -P production)"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.15.0",
+    "@types/node": "^22.13.1",
+    "@types/nodemailer": "^6.4.17",
+    "@types/qs": "^6.9.17",
+    "@typescript-eslint/eslint-plugin": "^8.15.0",
+    "@typescript-eslint/parser": "^8.15.0",
+    "bcrypt": "^6.0.0",
+    "copy-webpack-plugin": "^13.0.0",
+    "copyfiles": "^2.4.1",
+    "eslint": "^9.15.0",
+    "globals": "^15.12.0",
+    "pino-pretty": "^13.0.0",
+    "serverless-domain-manager": "^8.0.0",
+    "serverless-offline": "^14.4.0",
+    "serverless-prune-plugin": "^2.1.0",
+    "ts-loader": "^9.5.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.15.0",
+    "webpack": "^5.98.0",
+    "webpack-cli": "^6.0.1",
+    "webpack-node-externals": "^3.0.0"
+  }
+}
+[debug] [2025-09-14T10:52:30.541Z] Building nodejs source
+[info] i  functions: Loading and analyzing source code for codebase api to determine what to deploy 
+[debug] [2025-09-14T10:52:30.541Z] Could not find functions.yaml. Must use http discovery
+[debug] [2025-09-14T10:52:30.544Z] Found firebase-functions binary at '/home/harsh/Documents/wordwar/src/firebase/functions/backend/node_modules/.bin/firebase-functions'
+[info] Serving at port 8223
+
+[info] Connecting to MongoDB at mongodb+srv://gamesminispirit1:L2LHXroEX5ctYsp8@wordwar.jnoepfj.mongodb.net/wordwar
+
+[debug] [2025-09-14T10:52:30.868Z] Got response from /__/functions.yaml {"endpoints":{"api":{"availableMemoryMb":512,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["asia-south1"],"labels":{},"httpsTrigger":{},"entryPoint":"api"}},"specVersion":"v1alpha1","requiredAPIs":[],"extensions":{}}
+[info] Redis connected
+
+[info] MongoDB connected to database: wordwar
+

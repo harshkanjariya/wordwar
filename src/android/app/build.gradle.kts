@@ -13,7 +13,7 @@ android {
         applicationId = "com.harshkanjariya.wordwar"
         minSdk = 24
         targetSdk = 36
-        versionCode = 3
+        versionCode = 4
         versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -37,7 +37,7 @@ android {
                 buildConfigField(
                     "String",
                     "BACKEND_URL",
-                    "\"https://word-war-4.web.app/api/\""
+                    "\"http://192.168.1.4:10000/api/\""
                 )
             }
             create("staging") {

@@ -54,6 +54,7 @@ import com.harshkanjariya.wordwar.data.LocalStorage
 import com.harshkanjariya.wordwar.data.WordService
 import com.harshkanjariya.wordwar.data.WordInfo
 import com.harshkanjariya.wordwar.data.getUserIdFromJwt
+import com.harshkanjariya.wordwar.network.service_holder.GameServiceHolder
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.launch
@@ -76,8 +77,11 @@ fun QueueScreen(navController: NavController, matchSize: Int) {
         }
     }
 
+    val gameService = GameServiceHolder.api
+
     // Word of the day using WordService
     var currentWord by remember { mutableStateOf<WordInfo?>(null) }
+    var isWordLoading by remember { mutableStateOf(true) }
 
     // Load initial word and prepare next word
     LaunchedEffect(Unit) {
@@ -87,6 +91,8 @@ fun QueueScreen(navController: NavController, matchSize: Int) {
             WordService.loadNextWord() // Prepare next word
         } catch (e: Exception) {
             println("Error loading initial word: ${e.message}")
+        } finally {
+            isWordLoading = false
         }
     }
 
@@ -94,44 +100,39 @@ fun QueueScreen(navController: NavController, matchSize: Int) {
     val queueRef = database.getReference("matchmaking_queue").child(matchSize.toString())
     val liveGamesRef = database.getReference("live_games")
 
-    var statusMessage by remember { mutableStateOf("Checking for existing games...") }
+    var statusMessage by remember { mutableStateOf("Joining...") }
     var foundMatchId by remember { mutableStateOf<String?>(null) }
     var shouldJoinQueue by remember { mutableStateOf(false) }
 
-    // State to track if the initial check for a live game is complete
+    // Separate loading states for different components
+    var isCheckingActiveGame by remember { mutableStateOf(true) }
     var hasCheckedForGame by remember { mutableStateOf(false) }
 
-    // Step 1: Check for an existing game first, before joining the queue.
+    // Step 1: Check for an existing game using API call (backend already checks Firebase internally)
     LaunchedEffect(userId) {
         if (!userId.isNullOrEmpty()) {
-            val userGameRef = liveGamesRef
-                .orderByChild("players/$userId")
-                .limitToFirst(1)
-
-            val listener = object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    val gameSnapshot = snapshot.children.firstOrNull()
-                    if (gameSnapshot != null) {
-                        // User is already in a game, navigate to it immediately.
-                        foundMatchId = gameSnapshot.key
-                        statusMessage = "Already in a game. Redirecting..."
-                    } else {
-                        // User is not in a game, so they should join the queue.
-                        shouldJoinQueue = true
-                        statusMessage = "In queue..."
-                    }
-                    hasCheckedForGame = true
-                }
-
-                override fun onCancelled(error: DatabaseError) {
-                    // Handle error, but still proceed to join queue in case of network issue.
+            try {
+                val response = gameService.getActiveGame()
+                if (response.status == 200 && response.data != null && response.data.currentGameId != null) {
+                    // User is already in a game, navigate to it immediately
+                    foundMatchId = response.data.currentGameId
+                    statusMessage = "Already in a game. Redirecting..."
+                    // DO NOT join queue if user is already in a game
+                    shouldJoinQueue = false
+                } else {
+                    // User is not in a game, so they should join the queue
                     shouldJoinQueue = true
-                    hasCheckedForGame = true
-                    statusMessage = "Failed to check for games. Joining queue..."
+                    statusMessage = "In queue..."
                 }
+            } catch (e: Exception) {
+                println("Failed to fetch active game: ${e.message}")
+                // On error, still proceed to join queue
+                shouldJoinQueue = true
+                statusMessage = "Failed to check for games. Joining queue..."
+            } finally {
+                isCheckingActiveGame = false
+                hasCheckedForGame = true
             }
-
-            userGameRef.addListenerForSingleValueEvent(listener)
         }
     }
 
@@ -143,9 +144,22 @@ fun QueueScreen(navController: NavController, matchSize: Int) {
         }
     }
 
+    // Step 2.5: Clean up queue entry if user is already in a game
+    LaunchedEffect(foundMatchId) {
+        if (foundMatchId != null && !userId.isNullOrEmpty()) {
+            // Remove user from queue if they're already in a game
+            try {
+                queueRef.child(userId).removeValue().await()
+                println("Removed user $userId from queue - already in game $foundMatchId")
+            } catch (e: Exception) {
+                println("Failed to remove user from queue: ${e.message}")
+            }
+        }
+    }
+
     // Step 3: Listen for a match, only after the check is complete and we are in the queue.
-    DisposableEffect(hasCheckedForGame, userId) {
-        if (!hasCheckedForGame || userId.isNullOrEmpty()) {
+    DisposableEffect(hasCheckedForGame, userId, foundMatchId) {
+        if (!hasCheckedForGame || userId.isNullOrEmpty() || foundMatchId != null) {
             onDispose { }
             return@DisposableEffect onDispose { }
         }
@@ -185,8 +199,8 @@ fun QueueScreen(navController: NavController, matchSize: Int) {
         }
     }
 
-    // Show a loading screen while the userId or the check is not complete
-    if (userId.isNullOrEmpty() || !hasCheckedForGame) {
+    // Show a loading screen only if userId is empty
+    if (userId.isNullOrEmpty()) {
         GameBackground(
             backgroundColor = MaterialTheme.colorScheme.background,
             letterCount = 20
@@ -217,49 +231,108 @@ fun QueueScreen(navController: NavController, matchSize: Int) {
                     .padding(top = 48.dp, bottom = 80.dp)
                     .verticalScroll(scrollState)
             ) {
-                // Queue status
-                Text(
-                    text = statusMessage,
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    ),
-                    textAlign = TextAlign.Center
-                )
+                // Queue status with separate loader
+                if (isCheckingActiveGame) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Text(
+                            text = "Joining...",
+                            style = MaterialTheme.typography.headlineMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            ),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                } else {
+                    Text(
+                        text = statusMessage,
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        ),
+                        textAlign = TextAlign.Center
+                    )
+                }
 
                 Spacer(Modifier.height(8.dp))
 
-                Text(
-                    text = "Waiting for ${matchSize - 1} player${if (matchSize - 1 == 1) "" else "s"} to join...",
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    ),
-                    textAlign = TextAlign.Center
-                )
+                if (!isCheckingActiveGame) {
+                    Text(
+                        text = "Waiting for ${matchSize - 1} player${if (matchSize - 1 == 1) "" else "s"} to join...",
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        textAlign = TextAlign.Center
+                    )
+                }
 
                 Spacer(Modifier.height(20.dp))
 
-                // Word of the day card
-                currentWord?.let { word ->
-                    WordOfTheDayCard(
-                        currentWord = word,
-                        onRefresh = {
-                            // Load next word in a coroutine
-                            kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
-                                try {
-                                    currentWord = WordService.getCurrentWord()
-                                    WordService.loadNextWord() // Prepare next word
-                                } catch (e: Exception) {
-                                    println("Error refreshing word: ${e.message}")
-                                }
+                // Word of the day card with separate loader
+                if (isWordLoading) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                        ),
+                        elevation = CardDefaults.cardElevation(
+                            defaultElevation = 12.dp
+                        ),
+                        shape = RoundedCornerShape(24.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(48.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                CircularProgressIndicator(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                                Text(
+                                    text = "Loading word of the day...",
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
+                                    textAlign = TextAlign.Center
+                                )
                             }
                         }
-                    )
-                } ?: run {
-                    CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(48.dp)
-                    )
+                    }
+                } else {
+                    currentWord?.let { word ->
+                        WordOfTheDayCard(
+                            currentWord = word,
+                            onRefresh = {
+                                // Load next word in a coroutine
+                                kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
+                                    try {
+                                        isWordLoading = true
+                                        currentWord = WordService.getCurrentWord()
+                                        WordService.loadNextWord() // Prepare next word
+                                    } catch (e: Exception) {
+                                        println("Error refreshing word: ${e.message}")
+                                    } finally {
+                                        isWordLoading = false
+                                    }
+                                }
+                            }
+                        )
+                    }
                 }
 
                 Spacer(Modifier.height(40.dp))
