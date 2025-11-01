@@ -30,6 +30,11 @@ import bcrypt from 'bcryptjs';
 import {ChannelEnum, FullDocument} from "../../types/api";
 import {User, UserStatusEnum, UserType} from "../../types";
 import {configurationKeys} from "../../types/configuration";
+import {
+  DUMMY_USER,
+  isDummyUserEmail,
+  validateDummyUserPassword
+} from "../../config/dummy-user";
 
 export async function getUserCount() {
   return repositories.users.count();
@@ -156,6 +161,17 @@ export async function registerUser(data: RegisterUserDto) {
 }
 
 export async function validateUser(data: LoginUserDto) {
+  // Check if this is the dummy user
+  if (isDummyUserEmail(data.email)) {
+    const isValidPassword = await validateDummyUserPassword(data.password);
+    if (!isValidPassword) {
+      throw new ApiError("Passwords do not match", 400);
+    }
+    return {
+      token: generateToken(DUMMY_USER),
+    };
+  }
+
   const user = await repositories.users.findOne({
     filter: {
       email: data.email?.toLowerCase(),
@@ -354,6 +370,11 @@ export function searchUser(body: SearchUserDto, context: "client" | "admin") {
 }
 
 export async function getCachedUser(id: string) {
+  // Return dummy user if ID matches
+  if (isDummyUserEmail(id) || id === DUMMY_USER._id.toString()) {
+    return DUMMY_USER as FullDocument<User>;
+  }
+
   const cacheKey = `users:${id}`;
   const user = await redisManager.get<FullDocument<User> | undefined>(
     cacheKey,

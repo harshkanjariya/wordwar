@@ -51,3 +51,25 @@ fun getUserIdFromJwt(jwtToken: String?): String? {
         return null
     }
 }
+
+fun isDemoUser(jwtToken: String?): Boolean {
+    if (jwtToken == null) return false
+    try {
+        val parts = jwtToken.split(".")
+        if (parts.size != 3) return false
+
+        val payload = parts[1]
+        val payloadBytes = Base64.decode(payload, Base64.URL_SAFE or Base64.NO_PADDING)
+        val payloadJson = String(payloadBytes, Charsets.UTF_8)
+
+        val jsonObject = Gson().fromJson(payloadJson, JsonObject::class.java)
+        val email = jsonObject.get("email")?.asString
+        val userId = jsonObject.get("_id")?.asString
+        
+        // Check if it's the demo user by email or ID
+        return email?.lowercase() == "demo@wordwar.com" || userId == "000000000000000000000001"
+    } catch (e: Exception) {
+        e.printStackTrace()
+        return false
+    }
+}

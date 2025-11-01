@@ -15,6 +15,7 @@ import {
   validateWord,
   validateWordNotClaimed
 } from "../utils/game_action_validation";
+import {isDummyUser, DUMMY_GAME_DATA} from "../config/dummy-user";
 
 export async function createLiveGame(body: any) {
   const session = await repositories.startTransaction();
@@ -70,6 +71,11 @@ export async function createLiveGame(body: any) {
 }
 
 export async function performGameAction(user: FullDocument<User>, body: GameAction) {
+  // Dummy user cannot perform game actions
+  if (isDummyUser(user._id)) {
+    throw new ApiError("Demo user cannot perform game actions. This is read-only demo data.", 403);
+  }
+
   if (!body?.isValid()) {
     throw new ApiError("Invalid action", 400);
   }
@@ -198,6 +204,20 @@ export async function performGameAction(user: FullDocument<User>, body: GameActi
 }
 
 export async function getCurrentGameInfo(user: FullDocument<User>) {
+  // Return dummy game data for dummy user
+  if (isDummyUser(user._id)) {
+    if (DUMMY_GAME_DATA.liveGames.length > 0) {
+      return {
+        currentGameId: DUMMY_GAME_DATA.liveGames[0]._id.toString(),
+        gameData: DUMMY_GAME_DATA.liveGames[0],
+      };
+    }
+    return {
+      currentGameId: null,
+      gameData: null,
+    };
+  }
+
   const userData = await repositories.users.findOne({ filter: { _id: user._id } });
 
   if (!userData) {
@@ -298,6 +318,19 @@ export async function getCurrentGameInfo(user: FullDocument<User>) {
 }
 
 export async function getGameInfo(user: FullDocument<User>, gameId: string) {
+  // Return dummy game history for dummy user
+  if (isDummyUser(user._id)) {
+    const dummyGame = DUMMY_GAME_DATA.gameHistory.find(
+      (game) => game._id.toString() === gameId
+    );
+    
+    if (dummyGame) {
+      return dummyGame;
+    }
+    
+    throw new ApiError("Game not found", 404);
+  }
+
   const userData = await repositories.users.findOne({filter: {_id: user._id}});
 
   const gameHistory = await repositories.game_history.findOne({filter: {_id: ObjectId.createFromHexString(gameId)}});
@@ -326,6 +359,14 @@ export async function getGameInfo(user: FullDocument<User>, gameId: string) {
 }
 
 export async function quitGame(user: FullDocument<User>) {
+  // Dummy user can't quit games - just return success
+  if (isDummyUser(user._id)) {
+    return {
+      message: "Demo user cannot quit games",
+      success: false,
+    };
+  }
+
   const userData = await repositories.users.findOne({filter: {_id: user._id}});
   
   // If user has currentGameId, use the existing logic

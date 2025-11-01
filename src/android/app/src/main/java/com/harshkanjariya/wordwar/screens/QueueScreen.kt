@@ -54,6 +54,7 @@ import com.harshkanjariya.wordwar.data.LocalStorage
 import com.harshkanjariya.wordwar.data.WordService
 import com.harshkanjariya.wordwar.data.WordInfo
 import com.harshkanjariya.wordwar.data.getUserIdFromJwt
+import com.harshkanjariya.wordwar.data.isDemoUser
 import com.harshkanjariya.wordwar.network.service_holder.GameServiceHolder
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
@@ -108,8 +109,33 @@ fun QueueScreen(navController: NavController, matchSize: Int) {
     var isCheckingActiveGame by remember { mutableStateOf(true) }
     var hasCheckedForGame by remember { mutableStateOf(false) }
 
-    // Step 1: Check for an existing game using API call (backend already checks Firebase internally)
-    LaunchedEffect(userId) {
+    // Step 1: Check if demo user - simulate queue and redirect directly
+    LaunchedEffect(token) {
+        if (isDemoUser(token)) {
+            // Demo user: simulate being in queue without real API/Firebase calls
+            isCheckingActiveGame = false
+            hasCheckedForGame = true
+            statusMessage = "In queue..."
+            shouldJoinQueue = false
+            
+            // Wait 3 seconds to simulate queue
+            delay(3000)
+            
+            statusMessage = "Match found!"
+            SoundManager.matchFound()
+            
+            // Wait 2 more seconds and navigate directly
+            delay(2000)
+            
+            // Navigate to dummy game directly
+            navController.navigate("game/100000000000000000000001") {
+                popUpTo("menu")
+            }
+            
+            return@LaunchedEffect
+        }
+        
+        // Regular user flow - Check for an existing game using API call
         if (!userId.isNullOrEmpty()) {
             try {
                 val response = gameService.getActiveGame()
@@ -136,8 +162,13 @@ fun QueueScreen(navController: NavController, matchSize: Int) {
         }
     }
 
-    // Step 2: Conditionally join the queue, only if the check passes.
-    LaunchedEffect(shouldJoinQueue) {
+    // Step 2: Conditionally join the queue, only if the check passes and not demo user.
+    LaunchedEffect(shouldJoinQueue, token) {
+        if (isDemoUser(token)) {
+            // Demo user should not join Firebase queue
+            return@LaunchedEffect
+        }
+        
         if (shouldJoinQueue && !userId.isNullOrEmpty()) {
             queueRef.child(userId).setValue(mapOf("timestamp" to System.currentTimeMillis())).await()
             queueRef.child(userId).onDisconnect().removeValue()
@@ -157,8 +188,14 @@ fun QueueScreen(navController: NavController, matchSize: Int) {
         }
     }
 
-    // Step 3: Listen for a match, only after the check is complete and we are in the queue.
-    DisposableEffect(hasCheckedForGame, userId, foundMatchId) {
+    // Step 3: Listen for a match, only after the check is complete and we are in the queue. Skip for demo user.
+    DisposableEffect(hasCheckedForGame, userId, foundMatchId, token) {
+        if (isDemoUser(token)) {
+            // Demo user doesn't listen to Firebase
+            onDispose { }
+            return@DisposableEffect onDispose { }
+        }
+        
         if (!hasCheckedForGame || userId.isNullOrEmpty() || foundMatchId != null) {
             onDispose { }
             return@DisposableEffect onDispose { }
@@ -191,7 +228,7 @@ fun QueueScreen(navController: NavController, matchSize: Int) {
 
     // LaunchedEffect to navigate after a match is found
     LaunchedEffect(foundMatchId) {
-        if (foundMatchId != null) {
+        if (!foundMatchId.isNullOrEmpty()) {
             delay(2000) // Wait 2 seconds
             navController.navigate("game/${foundMatchId}") {
                 popUpTo("menu")
@@ -199,8 +236,8 @@ fun QueueScreen(navController: NavController, matchSize: Int) {
         }
     }
 
-    // Show a loading screen only if userId is empty
-    if (userId.isNullOrEmpty()) {
+    // Show a loading screen only if userId is empty and not demo user
+    if (userId.isNullOrEmpty() && !isDemoUser(token)) {
         GameBackground(
             backgroundColor = MaterialTheme.colorScheme.background,
             letterCount = 20
@@ -340,7 +377,7 @@ fun QueueScreen(navController: NavController, matchSize: Int) {
                 // Cancel button
                 OutlinedButton(
                     onClick = {
-                        if (userId.isNotEmpty()) {
+                        if (!userId.isNullOrEmpty() && !isDemoUser(token)) {
                             queueRef.child(userId).removeValue()
                         }
                         navController.popBackStack()

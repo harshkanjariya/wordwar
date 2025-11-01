@@ -83,6 +83,7 @@ import com.harshkanjariya.wordwar.components.CustomKeyboard
 import com.harshkanjariya.wordwar.components.WordGrid
 import com.harshkanjariya.wordwar.data.LocalStorage
 import com.harshkanjariya.wordwar.data.getUserIdFromJwt
+import com.harshkanjariya.wordwar.data.isDemoUser
 import com.harshkanjariya.wordwar.network.service.CellCoordinatePayload
 import com.harshkanjariya.wordwar.network.service.ClaimedWordPayload
 import com.harshkanjariya.wordwar.network.service.GameActionPayload
@@ -312,7 +313,46 @@ fun GameScreen(navController: NavController, matchId: String?) {
         }
     }
 
-    DisposableEffect(matchId, userId) {
+    // Demo user: Load static game data locally (no API calls)
+    LaunchedEffect(token, matchId) {
+        if (isDemoUser(token)) {
+            // Static demo game grid (10x10) - pre-filled with some letters
+            val demoGrid = listOf(
+                "W", "O", "R", "D", "", "", "", "", "", "",
+                "A", "R", "E", "A", "", "", "", "", "", "", 
+                "V", "I", "S", "T", "", "", "", "", "", "",
+                "E", "N", "D", "S", "", "", "", "", "", "",
+                "", "", "", "", "", "", "", "", "", "",
+                "", "", "", "", "", "", "", "", "", "",
+                "", "", "", "", "", "", "", "", "", "",
+                "", "", "", "", "", "", "", "", "", "",
+                "", "", "", "", "", "", "", "", "", "",
+                "", "", "", "", "", "", "", "", "", ""
+            )
+            
+            cells.clear()
+            cells.addAll(demoGrid)
+            
+            // Demo user is ALWAYS the current player
+            currentPlayer = userId
+            phase = GamePhase.EDIT
+            turnTimestamp = System.currentTimeMillis()
+            
+            showGamifiedMessage(
+                "Demo Game - Explore the interface! 🎮",
+                MessageType.INFO,
+                Icons.Default.Info
+            )
+        }
+    }
+
+    DisposableEffect(matchId, userId, token) {
+        // Demo user: Skip all Firebase interactions
+        if (isDemoUser(token)) {
+            onDispose { }
+            return@DisposableEffect onDispose { }
+        }
+        
         if (matchId.isNullOrBlank() || userId.isBlank()) {
             onDispose { }
             return@DisposableEffect onDispose { }
@@ -407,7 +447,20 @@ fun GameScreen(navController: NavController, matchId: String?) {
         onDispose { gameRef.removeEventListener(gameListener) }
     }
 
-    LaunchedEffect(turnTimestamp) {
+    LaunchedEffect(turnTimestamp, token) {
+        // Demo user: Looping timer 30 -> 0 seconds continuously
+        if (isDemoUser(token)) {
+            while (true) {
+                remainingTime = 30
+                while (remainingTime > 0) {
+                    delay(1000)
+                    remainingTime--
+                }
+                // Loop back to 30 seconds
+            }
+        }
+        
+        // Regular user timer logic
         val initialTimeLeft = 30 - ((System.currentTimeMillis() - turnTimestamp) / 1000).toInt()
         remainingTime = initialTimeLeft.coerceAtLeast(0)
 
@@ -454,90 +507,115 @@ fun GameScreen(navController: NavController, matchId: String?) {
                     currentPlayerId = currentPlayer,
                     activeGame = activeGame,
                     onExitClick = {
-                        scope.launch {
-                            try {
-                                gameRef.child("players").child(userId).child("status").onDisconnect()
-                                    .cancel()
-                                val result = GameServiceHolder.api.quitGame()
-                                if (result.status == 200 && result.data != null) {
+                        // Demo user: Just navigate back without API calls
+                        if (isDemoUser(token)) {
+                            navController.navigate("menu") {
+                                popUpTo(navController.graph.id) { inclusive = true }
+                            }
+                        } else {
+                            scope.launch {
+                                try {
+                                    gameRef.child("players").child(userId).child("status").onDisconnect()
+                                        .cancel()
+                                    val result = GameServiceHolder.api.quitGame()
+                                    if (result.status == 200 && result.data != null) {
+                                        navController.navigate("menu") {
+                                            popUpTo(navController.graph.id) { inclusive = true }
+                                        }
+                                    } else {
+                                        // Handle error - navigate to menu anyway
+                                        navController.navigate("menu") {
+                                            popUpTo(navController.graph.id) { inclusive = true }
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    // Handle exception - navigate to menu anyway
                                     navController.navigate("menu") {
                                         popUpTo(navController.graph.id) { inclusive = true }
                                     }
-                                } else {
-                                    // Handle error - navigate to menu anyway
-                                    navController.navigate("menu") {
-                                        popUpTo(navController.graph.id) { inclusive = true }
-                                    }
-                                }
-                            } catch (e: Exception) {
-                                // Handle exception - navigate to menu anyway
-                                navController.navigate("menu") {
-                                    popUpTo(navController.graph.id) { inclusive = true }
                                 }
                             }
                         }
                     },
                     onPlayerInfoClick = { showPlayerInfo = true },
                     onSpectate = {
-                        scope.launch {
-                            try {
-                                gameRef.child("players").child(userId).child("status")
-                                    .onDisconnect()
-                                    .cancel()
-                                val result = GameServiceHolder.api.quitGame()
-                                if (result.status == 200 && result.data != null) {
-                                    showGamifiedMessage(
-                                        "You are now spectating! 👀",
-                                        MessageType.INFO,
-                                        Icons.Default.Info
-                                    )
-                                } else {
-                                    // Handle error - still show spectating message
+                        // Demo user: Show message without API
+                        if (isDemoUser(token)) {
+                            showGamifiedMessage(
+                                "Demo mode - spectating disabled",
+                                MessageType.INFO,
+                                Icons.Default.Info
+                            )
+                        } else {
+                            scope.launch {
+                                try {
+                                    gameRef.child("players").child(userId).child("status")
+                                        .onDisconnect()
+                                        .cancel()
+                                    val result = GameServiceHolder.api.quitGame()
+                                    if (result.status == 200 && result.data != null) {
+                                        showGamifiedMessage(
+                                            "You are now spectating! 👀",
+                                            MessageType.INFO,
+                                            Icons.Default.Info
+                                        )
+                                    } else {
+                                        // Handle error - still show spectating message
+                                        showGamifiedMessage(
+                                            "You are now spectating! 👀",
+                                            MessageType.INFO,
+                                            Icons.Default.Info
+                                        )
+                                    }
+                                } catch (e: Exception) {
+                                    // Handle exception - still show spectating message
                                     showGamifiedMessage(
                                         "You are now spectating! 👀",
                                         MessageType.INFO,
                                         Icons.Default.Info
                                     )
                                 }
-                            } catch (e: Exception) {
-                                // Handle exception - still show spectating message
-                                showGamifiedMessage(
-                                    "You are now spectating! 👀",
-                                    MessageType.INFO,
-                                    Icons.Default.Info
-                                )
                             }
                         }
                     },
                     onVoteEndGame = {
-                        scope.launch {
-                            try {
-                                val isVoted = voteEndGamePlayers.contains(userId)
-                                if (isVoted) {
-                                    val updatedVotes =
-                                        voteEndGamePlayers.filter { it != userId }
-                                    gameRef.child("voteEndGame").setValue(updatedVotes)
+                        // Demo user: Show message but don't call Firebase
+                        if (isDemoUser(token)) {
+                            showGamifiedMessage(
+                                "Demo mode - voting disabled",
+                                MessageType.INFO,
+                                Icons.Default.Info
+                            )
+                        } else {
+                            scope.launch {
+                                try {
+                                    val isVoted = voteEndGamePlayers.contains(userId)
+                                    if (isVoted) {
+                                        val updatedVotes =
+                                            voteEndGamePlayers.filter { it != userId }
+                                        gameRef.child("voteEndGame").setValue(updatedVotes)
+                                        showGamifiedMessage(
+                                            "Vote removed! 🗳️",
+                                            MessageType.INFO,
+                                            Icons.Default.Info
+                                        )
+                                    } else {
+                                        // Add vote
+                                        val updatedVotes = voteEndGamePlayers + userId
+                                        gameRef.child("voteEndGame").setValue(updatedVotes)
+                                        showGamifiedMessage(
+                                            "Vote added! 🗳️",
+                                            MessageType.INFO,
+                                            Icons.Default.Info
+                                        )
+                                    }
+                                } catch (e: Exception) {
                                     showGamifiedMessage(
-                                        "Vote removed! 🗳️",
-                                        MessageType.INFO,
-                                        Icons.Default.Info
-                                    )
-                                } else {
-                                    // Add vote
-                                    val updatedVotes = voteEndGamePlayers + userId
-                                    gameRef.child("voteEndGame").setValue(updatedVotes)
-                                    showGamifiedMessage(
-                                        "Vote added! 🗳️",
-                                        MessageType.INFO,
-                                        Icons.Default.Info
+                                        "Failed to update vote: ${e.message}",
+                                        MessageType.ERROR,
+                                        Icons.Default.Warning
                                     )
                                 }
-                            } catch (e: Exception) {
-                                showGamifiedMessage(
-                                    "Failed to update vote: ${e.message}",
-                                    MessageType.ERROR,
-                                    Icons.Default.Warning
-                                )
                             }
                         }
                     },
@@ -600,6 +678,16 @@ fun GameScreen(navController: NavController, matchId: String?) {
                         },
                         onRemoveWord = { removeSelectedWord(it) },
                         onSkipTurn = {
+                            // Demo user: Show message but don't call function
+                            if (isDemoUser(token)) {
+                                showGamifiedMessage(
+                                    "Demo mode - explore the board!",
+                                    MessageType.INFO,
+                                    Icons.Default.Info
+                                )
+                                return@BottomGameControls
+                            }
+                            
                             scope.launch {
                                 if (isSkippingTurn) return@launch // Prevent multiple calls
                                 isSkippingTurn = true
@@ -634,33 +722,42 @@ fun GameScreen(navController: NavController, matchId: String?) {
                                         val col = filledCell.value?.index?.rem(gridSize)
 
                                         if (character != null && row != null && col != null) {
-                                            val payload = GameActionPayload(
-                                                character = character,
-                                                row = row,
-                                                col = col,
-                                                claimedWords = emptyList()
-                                            )
-                                            try {
-                                                val response = gameService.submitAction(payload)
-                                                if (response.status != 200) {
+                                            // Demo user: Just show success without API call
+                                            if (isDemoUser(token)) {
+                                                showGamifiedMessage(
+                                                    "Demo mode - letter placement simulated!",
+                                                    MessageType.SUCCESS,
+                                                    Icons.Default.CheckCircle
+                                                )
+                                            } else {
+                                                val payload = GameActionPayload(
+                                                    character = character,
+                                                    row = row,
+                                                    col = col,
+                                                    claimedWords = emptyList()
+                                                )
+                                                try {
+                                                    val response = gameService.submitAction(payload)
+                                                    if (response.status != 200) {
+                                                        showGamifiedMessage(
+                                                            response.message ?: "Action failed",
+                                                            MessageType.ERROR,
+                                                            Icons.Default.Warning
+                                                        )
+                                                    } else {
+                                                        showGamifiedMessage(
+                                                            "Letter placed successfully! 🎯",
+                                                            MessageType.SUCCESS,
+                                                            Icons.Default.CheckCircle
+                                                        )
+                                                    }
+                                                } catch (e: Exception) {
                                                     showGamifiedMessage(
-                                                        response.message ?: "Action failed",
+                                                        "Failed: ${e.message}",
                                                         MessageType.ERROR,
                                                         Icons.Default.Warning
                                                     )
-                                                } else {
-                                                    showGamifiedMessage(
-                                                        "Letter placed successfully! 🎯",
-                                                        MessageType.SUCCESS,
-                                                        Icons.Default.CheckCircle
-                                                    )
                                                 }
-                                            } catch (e: Exception) {
-                                                showGamifiedMessage(
-                                                    "Failed: ${e.message}",
-                                                    MessageType.ERROR,
-                                                    Icons.Default.Warning
-                                                )
                                             }
                                         } else {
                                             showGamifiedMessage(
@@ -687,35 +784,45 @@ fun GameScreen(navController: NavController, matchId: String?) {
                                                 claimedWords = claimedWordPayloads
                                             )
 
-                                            try {
-                                                val response = gameService.submitAction(payload)
-                                                if (response.status == 200) {
-                                                    isSubmitted = true
-                                                    val totalPoints =
-                                                        selectedWords.sumOf { calculateWordPoints(it.word) }
-                                                    val wordsList =
-                                                        selectedWords.joinToString(", ") { it.word }
+                                            // Demo user: Simulate submission without API
+                                            if (isDemoUser(token)) {
+                                                isSubmitted = true
+                                                showGamifiedMessage(
+                                                    "Demo mode - action simulated!",
+                                                    MessageType.SUCCESS,
+                                                    Icons.Default.Info
+                                                )
+                                            } else {
+                                                try {
+                                                    val response = gameService.submitAction(payload)
+                                                    if (response.status == 200) {
+                                                        isSubmitted = true
+                                                        val totalPoints =
+                                                            selectedWords.sumOf { calculateWordPoints(it.word) }
+                                                        val wordsList =
+                                                            selectedWords.joinToString(", ") { it.word }
+                                                        showGamifiedMessage(
+                                                            "🎯 You claimed ${selectedWords.size} words: $wordsList (+$totalPoints points total)!",
+                                                            MessageType.SUCCESS,
+                                                            Icons.Default.ThumbUp
+                                                        )
+                                                        selectedWords =
+                                                            emptyList() // Clear the list after successful submission
+                                                    } else {
+                                                        showGamifiedMessage(
+                                                            response.message ?: "Action failed",
+                                                            MessageType.ERROR,
+                                                            Icons.Default.Warning
+                                                        )
+                                                    }
+                                                } catch (e: Exception) {
+                                                    Log.e("submitAction", e.toString())
                                                     showGamifiedMessage(
-                                                        "🎯 You claimed ${selectedWords.size} words: $wordsList (+$totalPoints points total)!",
-                                                        MessageType.SUCCESS,
-                                                        Icons.Default.ThumbUp
-                                                    )
-                                                    selectedWords =
-                                                        emptyList() // Clear the list after successful submission
-                                                } else {
-                                                    showGamifiedMessage(
-                                                        response.message ?: "Action failed",
+                                                        "Failed: ${e.message}",
                                                         MessageType.ERROR,
                                                         Icons.Default.Warning
                                                     )
                                                 }
-                                            } catch (e: Exception) {
-                                                Log.e("submitAction", e.toString())
-                                                showGamifiedMessage(
-                                                    "Failed: ${e.message}",
-                                                    MessageType.ERROR,
-                                                    Icons.Default.Warning
-                                                )
                                             }
                                         } else {
                                             showGamifiedMessage(

@@ -37,7 +37,7 @@ android {
                 buildConfigField(
                     "String",
                     "BACKEND_URL",
-                    "\"http://192.168.1.4:10000/api/\""
+                    "\"http://192.168.1.2:10000/api/\""
                 )
             }
             create("staging") {
